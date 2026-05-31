@@ -42,4 +42,6 @@ void Dense_Final_Softmax(const float* giris, float* cikis, const DenseFinalParam
 
 void CypherPUF_CNN_Calistir(const float* giris_goruntusu, float* ham_agirliklar, float* cikis_olasiliklari);
 
+float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut);
+
 #endif

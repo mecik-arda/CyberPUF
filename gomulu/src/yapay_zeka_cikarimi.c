@@ -1,5 +1,7 @@
 #include "yapay_zeka_cikarimi.h"
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #define MAKS_TAMPON_BOYUTU (32 * 32 * 256)
 

@@ -1,5 +1,7 @@
 #include "cypherpuf_dsk.h"
 #include "platform_yapilandirmasi.h"
+#include <stdio.h>
+#include <string.h>
 
 static uint32_t base_addr = CYPHERPUF_TABAN_ADRES;
 
@@ -35,10 +37,10 @@ bool CypherPUF_AnahtarUret(void) {
 }
 
 bool CypherPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin_16b) {
-    uint32_t w0 = ((uint32_t)sifreli_metin_16b[3] << 24) | ((uint32_t)sifreli_metin_16b[2] << 16) | ((uint32_t)sifreli_metin_16b[1] << 8) | sifreli_metin_16b[0];
-    uint32_t w1 = ((uint32_t)sifreli_metin_16b[7] << 24) | ((uint32_t)sifreli_metin_16b[6] << 16) | ((uint32_t)sifreli_metin_16b[5] << 8) | sifreli_metin_16b[4];
-    uint32_t w2 = ((uint32_t)sifreli_metin_16b[11] << 24) | ((uint32_t)sifreli_metin_16b[10] << 16) | ((uint32_t)sifreli_metin_16b[9] << 8) | sifreli_metin_16b[8];
-    uint32_t w3 = ((uint32_t)sifreli_metin_16b[15] << 24) | ((uint32_t)sifreli_metin_16b[14] << 16) | ((uint32_t)sifreli_metin_16b[13] << 8) | sifreli_metin_16b[12];
+    uint32_t w3 = ((uint32_t)sifreli_metin_16b[0] << 24) | ((uint32_t)sifreli_metin_16b[1] << 16) | ((uint32_t)sifreli_metin_16b[2] << 8) | sifreli_metin_16b[3];
+    uint32_t w2 = ((uint32_t)sifreli_metin_16b[4] << 24) | ((uint32_t)sifreli_metin_16b[5] << 16) | ((uint32_t)sifreli_metin_16b[6] << 8) | sifreli_metin_16b[7];
+    uint32_t w1 = ((uint32_t)sifreli_metin_16b[8] << 24) | ((uint32_t)sifreli_metin_16b[9] << 16) | ((uint32_t)sifreli_metin_16b[10] << 8) | sifreli_metin_16b[11];
+    uint32_t w0 = ((uint32_t)sifreli_metin_16b[12] << 24) | ((uint32_t)sifreli_metin_16b[13] << 16) | ((uint32_t)sifreli_metin_16b[14] << 8) | sifreli_metin_16b[15];
 
     Xil_Out32(base_addr + CYPHERPUF_REG_VERI_GIRIS_0, w0);
     Xil_Out32(base_addr + CYPHERPUF_REG_VERI_GIRIS_1, w1);
@@ -71,25 +73,25 @@ bool CypherPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin
     uint32_t r2 = Xil_In32(base_addr + CYPHERPUF_REG_VERI_CIKIS_2);
     uint32_t r3 = Xil_In32(base_addr + CYPHERPUF_REG_VERI_CIKIS_3);
 
-    duz_metin_16b[0] = (uint8_t)(r0 & 0xFF);
-    duz_metin_16b[1] = (uint8_t)((r0 >> 8) & 0xFF);
-    duz_metin_16b[2] = (uint8_t)((r0 >> 16) & 0xFF);
-    duz_metin_16b[3] = (uint8_t)((r0 >> 24) & 0xFF);
+    duz_metin_16b[0] = (uint8_t)((r3 >> 24) & 0xFF);
+    duz_metin_16b[1] = (uint8_t)((r3 >> 16) & 0xFF);
+    duz_metin_16b[2] = (uint8_t)((r3 >> 8) & 0xFF);
+    duz_metin_16b[3] = (uint8_t)(r3 & 0xFF);
 
-    duz_metin_16b[4] = (uint8_t)(r1 & 0xFF);
-    duz_metin_16b[5] = (uint8_t)((r1 >> 8) & 0xFF);
-    duz_metin_16b[6] = (uint8_t)((r1 >> 16) & 0xFF);
-    duz_metin_16b[7] = (uint8_t)((r1 >> 24) & 0xFF);
+    duz_metin_16b[4] = (uint8_t)((r2 >> 24) & 0xFF);
+    duz_metin_16b[5] = (uint8_t)((r2 >> 16) & 0xFF);
+    duz_metin_16b[6] = (uint8_t)((r2 >> 8) & 0xFF);
+    duz_metin_16b[7] = (uint8_t)(r2 & 0xFF);
 
-    duz_metin_16b[8] = (uint8_t)(r2 & 0xFF);
-    duz_metin_16b[9] = (uint8_t)((r2 >> 8) & 0xFF);
-    duz_metin_16b[10] = (uint8_t)((r2 >> 16) & 0xFF);
-    duz_metin_16b[11] = (uint8_t)((r2 >> 24) & 0xFF);
+    duz_metin_16b[8] = (uint8_t)((r1 >> 24) & 0xFF);
+    duz_metin_16b[9] = (uint8_t)((r1 >> 16) & 0xFF);
+    duz_metin_16b[10] = (uint8_t)((r1 >> 8) & 0xFF);
+    duz_metin_16b[11] = (uint8_t)(r1 & 0xFF);
 
-    duz_metin_16b[12] = (uint8_t)(r3 & 0xFF);
-    duz_metin_16b[13] = (uint8_t)((r3 >> 8) & 0xFF);
-    duz_metin_16b[14] = (uint8_t)((r3 >> 16) & 0xFF);
-    duz_metin_16b[15] = (uint8_t)((r3 >> 24) & 0xFF);
+    duz_metin_16b[12] = (uint8_t)((r0 >> 24) & 0xFF);
+    duz_metin_16b[13] = (uint8_t)((r0 >> 16) & 0xFF);
+    duz_metin_16b[14] = (uint8_t)((r0 >> 8) & 0xFF);
+    duz_metin_16b[15] = (uint8_t)(r0 & 0xFF);
 
     return true;
 }
@@ -98,6 +100,16 @@ void CypherPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, 
     uint32_t blocks = boyut_bayt / 16;
     for (uint32_t i = 0; i < blocks; i++) {
         CypherPUF_BlokSifreCoz(&sifreli_metin[i * 16], &duz_metin[i * 16]);
+    }
+    
+    uint32_t remainder = boyut_bayt % 16;
+    if (remainder != 0) {
+        printf("UYARI: Sifreli metin boyutu (%u) 16'nin kati degil. Son %u bayt isleniyor.\n", boyut_bayt, remainder);
+        uint8_t temp_sifreli[16] = {0};
+        uint8_t temp_duz[16] = {0};
+        memcpy(temp_sifreli, &sifreli_metin[blocks * 16], remainder);
+        CypherPUF_BlokSifreCoz(temp_sifreli, temp_duz);
+        memcpy(&duz_metin[blocks * 16], temp_duz, remainder);
     }
 }
 

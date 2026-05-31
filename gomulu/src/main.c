@@ -69,37 +69,6 @@ const uint8_t sifreli_agirliklar[64] = {
 const uint32_t SIFRELI_VERI_BOYUTU = 64;
 #endif
 
-float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut) {
-    uint32_t ofset = 0;
-    
-    if (cozulmus_veri[0] != 'C' || cozulmus_veri[1] != 'P' || cozulmus_veri[2] != 'U' || cozulmus_veri[3] != 'F') {
-        printf("HATA: Gecersiz CPUF sihirli numarasi.\n");
-        return NULL;
-    }
-    ofset += 4;
-    
-    uint8_t ver_major = cozulmus_veri[ofset++];
-    uint8_t ver_minor = cozulmus_veri[ofset++];
-    
-    uint32_t toplam_diziler;
-    memcpy(&toplam_diziler, &cozulmus_veri[ofset], sizeof(uint32_t));
-    ofset += 4;
-    
-    uint64_t toplam_elemanlar;
-    memcpy(&toplam_elemanlar, &cozulmus_veri[ofset], sizeof(uint64_t));
-    ofset += 8;
-    
-    ofset += 16;
-    
-    for (uint32_t i = 0; i < toplam_diziler; i++) {
-        uint8_t ndim = cozulmus_veri[ofset++];
-        ofset += ndim * 4;
-        ofset += 4;
-        ofset += 4;
-    }
-    
-    return (float*)&cozulmus_veri[ofset];
-}
 
 int main(void) {
     printf("========================================\n");

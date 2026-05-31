@@ -41,8 +41,9 @@ static uint8_t Hamming74_HataDuzelt(uint8_t gurultulu_d, uint8_t orijinal_p, int
 void FuzzyExtractor_Kayit(const uint8_t* puf_ham_anahtar, YardimciVeri* yardimci_veri, uint8_t* guvenli_anahtar) {
     // 1. Rastgele bir guvenli anahtar (AES anahtari) uret.
     // Gercek bir donanimda True Random Number Generator (TRNG) kullanilir.
-    // Biz burada basitce rand() kullaniyoruz.
-    srand(12345); // Ornek tohum
+    // Biz burada PUF ham anahtarindan elde edilen degeri seed (tohum) olarak kullaniyoruz.
+    uint32_t seed_val = puf_ham_anahtar[0] | (puf_ham_anahtar[1] << 8) | (puf_ham_anahtar[2] << 16) | (puf_ham_anahtar[3] << 24);
+    srand(seed_val);
     for (int i = 0; i < PUF_ANAHTAR_BOYUTU; i++) {
         guvenli_anahtar[i] = rand() & 0xFF;
     }

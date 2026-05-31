@@ -27,6 +27,7 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 - **Ring Oscillator PUF (RO-PUF):** 16 çift (toplam 32) Ring Oscillator ile inşa edilen özel bir fiziksel klonlanamaz fonksiyon. Üretim varyasyonlarını kullanarak eşsiz bir 256-bit anahtar üretir.
 - **Anahtar Üretimi:** Ortam gürültüsünü ortadan kaldırmak için bit başına 16 kez PUF salınımlarını örnekleyen çoğunluk oylaması (majority-voting) mekanizması.
 - **AES-256 Çözümleme Motoru:** FIPS-197 uyumlu, tam donanımlı AES çözümleme boru hattı (pipeline).
+- **Yan Kanal Saldırı Koruması (SCA Countermeasures):** AES şifre çözme modülüne entegre edilmiş LFSR tabanlı yapay güç gürültüsü üreteci ve rastgele gecikme (Random Stall) enjeksiyonu. Güç Analizi (DPA/CPA) ve Elektromanyetik (EMA) saldırılarına karşı donanımsal koruma sağlar.
 - **AXI4-Lite Wrapper:** İşlemci Sistemi (ARM Cortex-A) ile haberleşmeyi sağlamak için tüm kriptografi çekirdeğinin 20 farklı bellek eşlemeli (memory-mapped) yazmaç ile (0x00 - 0x4C) AXI4-Lite arayüzüne sarılması.
 
 #### Faz 3: Gömülü Yapay Zeka Çıkarımı (C/C++ Bare-Metal)
