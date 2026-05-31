@@ -30,6 +30,46 @@ void Conv2D_3x3_Same(const float* giris, float* cikis, const ConvLayerParams* pa
     }
 }
 
+float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut) {
+    uint32_t ofset = 0;
+    
+    if (toplam_boyut < 16) {
+        printf("HATA: Veri boyutu cok kucuk.\n");
+        return NULL;
+    }
+    
+    if (cozulmus_veri[0] != 'C' || cozulmus_veri[1] != 'P' || cozulmus_veri[2] != 'U' || cozulmus_veri[3] != 'F') {
+        printf("HATA: Gecersiz CPUF sihirli numarasi.\n");
+        return NULL;
+    }
+    ofset += 4;
+    
+    uint8_t ver_major = cozulmus_veri[ofset++];
+    uint8_t ver_minor = cozulmus_veri[ofset++];
+    
+    uint32_t toplam_diziler;
+    memcpy(&toplam_diziler, &cozulmus_veri[ofset], sizeof(uint32_t));
+    ofset += 4;
+    
+    uint64_t toplam_elemanlar;
+    memcpy(&toplam_elemanlar, &cozulmus_veri[ofset], sizeof(uint64_t));
+    ofset += 8;
+    
+    ofset += 16;
+    
+    for (uint32_t i = 0; i < toplam_diziler; i++) {
+        if (ofset >= toplam_boyut) return NULL;
+        uint8_t ndim = cozulmus_veri[ofset++];
+        ofset += ndim * 4;
+        if (ofset + 8 > toplam_boyut) return NULL;
+        ofset += 8;
+    }
+    
+    if (ofset >= toplam_boyut) return NULL;
+    
+    return (float*)&cozulmus_veri[ofset];
+}
+
 void BatchNorm_ReLU(float* data, const ConvLayerParams* params, int h, int w, int c) {
     float epsilon = 1e-3f;
     for (int i = 0; i < h * w; i++) {
