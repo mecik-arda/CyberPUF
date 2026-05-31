@@ -31,6 +31,7 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 
 #### Faz 3: Gömülü Yapay Zeka Çıkarımı (C/C++ Bare-Metal)
 - **Donanım Soyutlama Katmanı (HAL):** Memory-mapped I/O üzerinden VHDL modüllerini kontrol eden, PUF üretimini tetikleyen ve AES motoruna 16-byte'lık şifreli bloklar besleyen özel C sürücüleri (`cypherpuf_dsk.c`).
+- **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile %100 oranında onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`).
 - **Dinamik İkili Ayrıştırıcı (Parser):** Çözülen `float32` ağırlık dizilerini bellekte eşlemek için özel CPUF başlıklarını dinamik olarak tarayan ayrıştırıcı.
 - **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D, MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
 
@@ -110,7 +111,7 @@ cd donanim
 **4. Faz 3'ü Çalıştırma (Gömülü C Simülasyonu)**
 ```bash
 cd gomulu
-gcc src/main.c src/cypherpuf_dsk.c src/yapay_zeka_cikarimi.c -lm -o cypherpuf_sim.exe
+gcc src/main.c src/cypherpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c -lm -o cypherpuf_sim.exe
 ./cypherpuf_sim.exe
 ```
 
@@ -143,6 +144,7 @@ The project is structured into three continuous phases that bridge Software AI, 
 
 #### Phase 3: Embedded AI Inference (C/C++ Bare-Metal)
 - **Hardware Abstraction Layer (HAL):** Custom C drivers (`cypherpuf_dsk.c`) to control the VHDL IP via memory-mapped I/O, trigger PUF generation, and feed encrypted 16-byte blocks to the AES engine.
+- **Fuzzy Extractor (Helper Data Generator):** A smart error correction module (`yardimci_veri_uretici.c`) that perfectly corrects temperature/voltage-induced bit errors (noise) in the PUF key using Code-Offset and Hamming(7,4) Error Correction Codes (ECC).
 - **Dynamic Binary Parser:** An embedded parser that scans the custom CPUF headers dynamically in memory to map the decrypted `float32` weight arrays.
 - **Bare-Metal CNN Engine:** A C-based AI inference engine written entirely from scratch without external libraries. It supports Conv2D, MaxPool, Dense, and Fused BatchNorm+ReLU layers, utilizing a ping-pong buffer technique to minimize RAM fragmentation.
 
@@ -242,6 +244,6 @@ cd donanim
 **4. Running Phase 3 (Embedded C Simulation)**
 ```bash
 cd gomulu
-gcc src/main.c src/cypherpuf_dsk.c src/yapay_zeka_cikarimi.c -lm -o cypherpuf_sim.exe
+gcc src/main.c src/cypherpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c -lm -o cypherpuf_sim.exe
 ./cypherpuf_sim.exe
 ```

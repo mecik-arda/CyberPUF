@@ -6,6 +6,7 @@
 #include "cypherpuf_dsk.h"
 #include "yapay_zeka_cikarimi.h"
 #include "test_goruntusu.h"
+#include "yardimci_veri_uretici.h"
 
 extern const uint8_t sifreli_agirliklar[];
 extern const uint32_t SIFRELI_VERI_BOYUTU;
@@ -121,6 +122,39 @@ int main(void) {
     printf("      -> PUF Anahtari (Hex): ");
     for(int i=0; i<32; i++) printf("%02X", puf_anahtari[i]);
     printf("\n");
+    
+    printf("\n--- FUZZY EXTRACTOR TESTI (YARDIMCI VERI & HATA DUZELTME) ---\n");
+    YardimciVeri yardimci_veri;
+    uint8_t gercek_anahtar_kayit[32];
+    uint8_t gercek_anahtar_cikarim[32];
+
+    printf("1. Kayit (Enrollment) Asamasi...\n");
+    FuzzyExtractor_Kayit(puf_anahtari, &yardimci_veri, gercek_anahtar_kayit);
+    printf("   -> Rastgele Uretilen Guvenli Anahtar: ");
+    for(int i=0; i<32; i++) printf("%02X", gercek_anahtar_kayit[i]);
+    printf("\n");
+
+    printf("2. PUF Gurultusu (Hata Enjeksiyonu) Simule Ediliyor...\n");
+    uint8_t gurultulu_puf_anahtari[32];
+    memcpy(gurultulu_puf_anahtari, puf_anahtari, 32);
+    // 3 farkli byte'ta 1'er bit hata olustur (Hamming kodu duzeltebilir mi diye test)
+    gurultulu_puf_anahtari[5] ^= 0x01;
+    gurultulu_puf_anahtari[12] ^= 0x04;
+    gurultulu_puf_anahtari[27] ^= 0x08;
+    printf("   -> Hata enjekte edildi (Byte 5, 12 ve 27).\n");
+
+    printf("3. Cikarim (Reconstruction) Asamasi...\n");
+    int duzeltilen_hata = FuzzyExtractor_Cikarim(gurultulu_puf_anahtari, &yardimci_veri, gercek_anahtar_cikarim);
+    printf("   -> Cikarim Sonucu Uretilen Anahtar: ");
+    for(int i=0; i<32; i++) printf("%02X", gercek_anahtar_cikarim[i]);
+    printf("\n   -> Toplam duzeltilen bit hatasi: %d\n", duzeltilen_hata);
+
+    if (memcmp(gercek_anahtar_kayit, gercek_anahtar_cikarim, 32) == 0) {
+        printf("   -> BASARILI: Gercek anahtar '%d' bit hatasina ragmen %%100 dogru sekilde onarildi!\n", duzeltilen_hata);
+    } else {
+        printf("   -> HATA: Anahtar onarilamadi.\n");
+    }
+    printf("---------------------------------------------------------------\n");
     
     printf("\n[2/4] Model agirliklari icin bellek ayriliyor (Boyut: %u bayt)...\n", SIFRELI_VERI_BOYUTU);
     uint8_t* cozulmus_bellek = (uint8_t*)malloc(SIFRELI_VERI_BOYUTU);
