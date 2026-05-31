@@ -30,7 +30,7 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 - **AXI4-Lite Wrapper:** İşlemci Sistemi (ARM Cortex-A) ile haberleşmeyi sağlamak için tüm kriptografi çekirdeğinin 20 farklı bellek eşlemeli (memory-mapped) yazmaç ile (0x00 - 0x4C) AXI4-Lite arayüzüne sarılması.
 
 #### Faz 3: Gömülü Yapay Zeka Çıkarımı (C/C++ Bare-Metal)
-- **Donanım Soyutlama Katmanı (HAL):** Memory-mapped I/O üzerinden VHDL modüllerini kontrol eden, PUF üretimini tetikleyen ve AES motoruna 16-byte'lık şifreli bloklar besleyen özel C sürücüleri (`cypherpuf_hal.c`).
+- **Donanım Soyutlama Katmanı (HAL):** Memory-mapped I/O üzerinden VHDL modüllerini kontrol eden, PUF üretimini tetikleyen ve AES motoruna 16-byte'lık şifreli bloklar besleyen özel C sürücüleri (`cypherpuf_dsk.c`).
 - **Dinamik İkili Ayrıştırıcı (Parser):** Çözülen `float32` ağırlık dizilerini bellekte eşlemek için özel CPUF başlıklarını dinamik olarak tarayan ayrıştırıcı.
 - **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D, MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
 
@@ -110,7 +110,7 @@ cd donanim
 **4. Faz 3'ü Çalıştırma (Gömülü C Simülasyonu)**
 ```bash
 cd gomulu
-gcc src/main.c src/cypherpuf_hal.c src/ai_inference.c -lm -o cypherpuf_sim.exe
+gcc src/main.c src/cypherpuf_dsk.c src/yapay_zeka_cikarimi.c -lm -o cypherpuf_sim.exe
 ./cypherpuf_sim.exe
 ```
 
@@ -142,7 +142,7 @@ The project is structured into three continuous phases that bridge Software AI, 
 - **AXI4-Lite Wrapper:** The entire crypto-core is wrapped in an AXI4-Lite slave interface with 20 distinct memory-mapped registers (0x00 to 0x4C) for seamless communication with the Processing System (ARM Cortex-A).
 
 #### Phase 3: Embedded AI Inference (C/C++ Bare-Metal)
-- **Hardware Abstraction Layer (HAL):** Custom C drivers (`cypherpuf_hal.c`) to control the VHDL IP via memory-mapped I/O, trigger PUF generation, and feed encrypted 16-byte blocks to the AES engine.
+- **Hardware Abstraction Layer (HAL):** Custom C drivers (`cypherpuf_dsk.c`) to control the VHDL IP via memory-mapped I/O, trigger PUF generation, and feed encrypted 16-byte blocks to the AES engine.
 - **Dynamic Binary Parser:** An embedded parser that scans the custom CPUF headers dynamically in memory to map the decrypted `float32` weight arrays.
 - **Bare-Metal CNN Engine:** A C-based AI inference engine written entirely from scratch without external libraries. It supports Conv2D, MaxPool, Dense, and Fused BatchNorm+ReLU layers, utilizing a ping-pong buffer technique to minimize RAM fragmentation.
 
@@ -242,6 +242,6 @@ cd donanim
 **4. Running Phase 3 (Embedded C Simulation)**
 ```bash
 cd gomulu
-gcc src/main.c src/cypherpuf_hal.c src/ai_inference.c -lm -o cypherpuf_sim.exe
+gcc src/main.c src/cypherpuf_dsk.c src/yapay_zeka_cikarimi.c -lm -o cypherpuf_sim.exe
 ./cypherpuf_sim.exe
 ```
