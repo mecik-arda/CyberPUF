@@ -1,4 +1,4 @@
-# CypherPUF: PUF-Based Edge-AI Model Weight Encryption
+# CypherPUF: PUF Tabanlı Uç Yapay Zeka (Edge-AI) Model Ağırlığı Şifrelemesi
 
 [Türkçe](#turkce) | [English](#english)
 
