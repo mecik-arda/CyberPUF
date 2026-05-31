@@ -231,10 +231,10 @@ def verify_encryption():
         if parsed['auth_tag']:
             print(f"  Auth Tag Uzunlugu: {len(parsed['auth_tag'])} byte")
         print(f"  SONUC: BASARILI")
-        test_results.append(('Dosya Parsing', True, 'Basarili'))
+        test_results.append(('Dosya Ayristirma', True, 'Basarili'))
     except Exception as e:
         print(f"  SONUC: BASARISIZ - {str(e)}")
-        test_results.append(('Dosya Parsing', False, str(e)))
+        test_results.append(('Dosya Ayristirma', False, str(e)))
         sys.exit(1)
 
     print("\n" + "-" * 70)
@@ -254,10 +254,10 @@ def verify_encryption():
         )
         print(f"  Cozumlenen boyut : {len(decrypted_data):,} byte")
         print(f"  SONUC: BASARILI")
-        test_results.append(('AES Decryption', True, 'Basarili'))
+        test_results.append(('AES Sifre Cozme', True, 'Basarili'))
     except Exception as e:
         print(f"  SONUC: BASARISIZ - {str(e)}")
-        test_results.append(('AES Decryption', False, str(e)))
+        test_results.append(('AES Sifre Cozme', False, str(e)))
         sys.exit(1)
 
     print("\n" + "-" * 70)
@@ -273,13 +273,13 @@ def verify_encryption():
             print(f"  Cozumlenen boyut : {len(decrypted_data):,} byte")
             print(f"  Byte-byte eslesme: EVET")
             print(f"  SONUC: BASARILI")
-            test_results.append(('Binary Karsilastirma', True, 'Byte-byte eslesme'))
+            test_results.append(('Ikili Veri Kiyaslamasi', True, 'Byte-byte eslesme'))
         else:
             print(f"  SONUC: BASARISIZ - Veriler eslesmedi")
-            test_results.append(('Binary Karsilastirma', False, 'Veriler eslesmedi'))
+            test_results.append(('Ikili Veri Kiyaslamasi', False, 'Veriler eslesmedi'))
     else:
         print(f"  ATLANDI: Orijinal dosya bulunamadi: {original_weights_bin}")
-        test_results.append(('Binary Karsilastirma', None, 'Orijinal dosya bulunamadi'))
+        test_results.append(('Ikili Veri Kiyaslamasi', None, 'Orijinal dosya bulunamadi'))
 
     print("\n" + "-" * 70)
     print("TEST 4: Agirlik dizilerini ayristirma ve dogrulama")
@@ -296,10 +296,10 @@ def verify_encryption():
             print(f"  Dizi {i:3d}: Sekil={str(shape):25s} | Min={np.min(arr):+.6f} | Max={np.max(arr):+.6f} | Mean={np.mean(arr):+.6f}")
 
         print(f"  SONUC: BASARILI")
-        test_results.append(('Weight Parsing', True, 'Basarili'))
+        test_results.append(('Agirlik Ayristirmasi', True, 'Basarili'))
     except Exception as e:
         print(f"  SONUC: BASARISIZ - {str(e)}")
-        test_results.append(('Weight Parsing', False, str(e)))
+        test_results.append(('Agirlik Ayristirmasi', False, str(e)))
 
     print("\n" + "-" * 70)
     print("TEST 5: NumPy orijinal agirliklarla karsilastirma")
@@ -313,17 +313,17 @@ def verify_encryption():
             if match_result:
                 print(f"  Karsilastirma    : {match_message}")
                 print(f"  SONUC: BASARILI")
-                test_results.append(('NumPy Karsilastirma', True, match_message))
+                test_results.append(('NumPy Kiyaslamasi', True, match_message))
             else:
                 print(f"  Karsilastirma    : {match_message}")
                 print(f"  SONUC: BASARISIZ")
-                test_results.append(('NumPy Karsilastirma', False, match_message))
+                test_results.append(('NumPy Kiyaslamasi', False, match_message))
         except Exception as e:
             print(f"  SONUC: BASARISIZ - {str(e)}")
-            test_results.append(('NumPy Karsilastirma', False, str(e)))
+            test_results.append(('NumPy Kiyaslamasi', False, str(e)))
     else:
         print(f"  ATLANDI: NPZ dosyasi bulunamadi: {original_weights_npz}")
-        test_results.append(('NumPy Karsilastirma', None, 'NPZ dosyasi bulunamadi'))
+        test_results.append(('NumPy Kiyaslamasi', None, 'NPZ dosyasi bulunamadi'))
 
     print("\n" + "-" * 70)
     print("TEST 6: SHA-256 butunluk kontrolu")
@@ -338,14 +338,14 @@ def verify_encryption():
     if decrypted_sha256 == original_sha256:
         print(f"  Hash eslesmesi     : EVET")
         print(f"  SONUC: BASARILI")
-        test_results.append(('SHA-256 Dogrulama', True, 'Hash eslesti'))
+        test_results.append(('SHA-256 Butunluk Kontrolu', True, 'Hash eslesti'))
     elif original_sha256 == 'N/A':
         print(f"  ATLANDI: Orijinal dosya yok")
-        test_results.append(('SHA-256 Dogrulama', None, 'Orijinal dosya yok'))
+        test_results.append(('SHA-256 Butunluk Kontrolu', None, 'Orijinal dosya yok'))
     else:
         print(f"  Hash eslesmesi     : HAYIR")
         print(f"  SONUC: BASARISIZ")
-        test_results.append(('SHA-256 Dogrulama', False, 'Hash eslesmedi'))
+        test_results.append(('SHA-256 Butunluk Kontrolu', False, 'Hash eslesmedi'))
 
     print("\n" + "-" * 70)
     print("TEST 7: Yanlis anahtar ile cozumleme testi (negatif test)")
@@ -387,15 +387,15 @@ def verify_encryption():
         )
         if parsed['encryption_mode'] == 'GCM':
             print(f"  SONUC: BASARISIZ - Bozulmus veri GCM'de tespit edilmeliydi!")
-            test_results.append(('Tamper Detection', False, 'Bozulma tespit edilemedi'))
+            test_results.append(('Dis Mudahale Tespiti', False, 'Bozulma tespit edilemedi'))
         else:
             print(f"  Not: CBC modunda tamper detection desteklenmez (beklenen).")
-            test_results.append(('Tamper Detection', True, 'CBC modu - beklenen davranis'))
+            test_results.append(('Dis Mudahale Tespiti', True, 'CBC modu - beklenen davranis'))
     except Exception as e:
         print(f"  Bozulmus veri beklendigi gibi tespit edildi.")
         print(f"  Hata mesaji: {type(e).__name__}")
         print(f"  SONUC: BASARILI (beklenen davranis)")
-        test_results.append(('Tamper Detection', True, 'Bozulma tespit edildi'))
+        test_results.append(('Dis Mudahale Tespiti', True, 'Bozulma tespit edildi'))
 
     print("\n" + "=" * 70)
     print("DOGRULAMA SONUC OZETI")
