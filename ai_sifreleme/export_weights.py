@@ -149,10 +149,10 @@ def save_weights_as_numpy(weight_arrays, weight_manifest, output_dir):
 
 def generate_weight_statistics(weight_arrays, weight_manifest):
     stats = {
-        'total_arrays': len(weight_arrays),
-        'total_parameters': sum(np.prod(arr.shape) for arr in weight_arrays),
-        'total_size_bytes': sum(arr.nbytes for arr in weight_arrays),
-        'total_size_float32_bytes': sum(np.prod(arr.shape) * 4 for arr in weight_arrays),
+        'total_arrays': int(len(weight_arrays)),
+        'total_parameters': int(sum(np.prod(arr.shape) for arr in weight_arrays)),
+        'total_size_bytes': int(sum(arr.nbytes for arr in weight_arrays)),
+        'total_size_float32_bytes': int(sum(np.prod(arr.shape) * 4 for arr in weight_arrays)),
         'global_min': float(min(np.min(arr) for arr in weight_arrays)),
         'global_max': float(max(np.max(arr) for arr in weight_arrays)),
         'global_mean': float(np.mean([np.mean(arr) for arr in weight_arrays])),

@@ -103,13 +103,13 @@ python run_phase1.py
 
 **3. Faz 2'yi Derleme (VHDL Donanımı)**
 ```powershell
-cd phase2_hardware
+cd donanim
 .\compile.ps1
 ```
 
 **4. Faz 3'ü Çalıştırma (Gömülü C Simülasyonu)**
 ```bash
-cd phase3_embedded
+cd gomulu
 gcc src/main.c src/cypherpuf_hal.c src/ai_inference.c -lm -o cypherpuf_sim.exe
 ./cypherpuf_sim.exe
 ```
@@ -203,16 +203,16 @@ Simulasyon tamamlandi.
 ### Directory Structure
 ```text
 CypherPUF/
-├── phase1_ai_encryption/          # Python AI & Crypto Tools
+├── ai_sifreleme/                  # Python AI & Crypto Tools
 │   ├── train_model.py             # Trains the CNN model
 │   ├── export_weights.py          # Creates the .cpuf binary
 │   ├── encrypt_weights.py         # Encrypts CPUF to .cpfe / .h
 │   └── verify_encryption.py       # Validates the encryption
-├── phase2_hardware/               # VHDL Hardware Design
+├── donanim/                       # VHDL Hardware Design
 │   ├── vhdl/                      # PUF, AES, and AXI source codes
 │   ├── testbench/                 # VHDL Simulation Testbenches
 │   └── constraints/               # Xilinx XDC constraints files
-├── phase3_embedded/               # Bare-Metal C Application
+├── gomulu/                        # Bare-Metal C Application
 │   ├── src/                       # HAL, AI Inference, and main program
 ├── run_phase1.py                  # Python Automation Orchestrator
 ├── requirements.txt               # Python Dependencies
@@ -235,13 +235,13 @@ python run_phase1.py
 
 **3. Compiling Phase 2 (VHDL Hardware)**
 ```powershell
-cd phase2_hardware
+cd donanim
 .\compile.ps1
 ```
 
 **4. Running Phase 3 (Embedded C Simulation)**
 ```bash
-cd phase3_embedded
+cd gomulu
 gcc src/main.c src/cypherpuf_hal.c src/ai_inference.c -lm -o cypherpuf_sim.exe
 ./cypherpuf_sim.exe
 ```

@@ -177,7 +177,7 @@ def parse_weight_binary(plaintext_data):
 def compare_with_original(decrypted_weights, original_weights_path):
     original_data = np.load(original_weights_path)
 
-    original_arrays = [original_data[key] for key in sorted(original_data.keys())]
+    original_arrays = [original_data[key] for key in original_data.files]
     decrypted_arrays = decrypted_weights['weight_arrays']
 
     if len(original_arrays) != len(decrypted_arrays):

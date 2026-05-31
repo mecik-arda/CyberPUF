@@ -66,3 +66,6 @@ work-obj08.cf
 .vscode/
 .idea/
 *.swp
+
+# CypherPUF Outputs
+output/

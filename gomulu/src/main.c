@@ -68,111 +68,111 @@ const uint8_t encrypted_weights[64] = {
 const uint32_t ENCRYPTED_DATA_SIZE = 64;
 #endif
 
-float* Parse_CPUF_Binary(uint8_t* decrypted_data, uint32_t total_size) {
-    uint32_t offset = 0;
+float* Parse_CPUF_Binary(uint8_t* cozulmus_veri, uint32_t toplam_boyut) {
+    uint32_t ofset = 0;
     
-    if (decrypted_data[0] != 'C' || decrypted_data[1] != 'P' || decrypted_data[2] != 'U' || decrypted_data[3] != 'F') {
-        printf("ERROR: Invalid CPUF magic number.\n");
+    if (cozulmus_veri[0] != 'C' || cozulmus_veri[1] != 'P' || cozulmus_veri[2] != 'U' || cozulmus_veri[3] != 'F') {
+        printf("HATA: Gecersiz CPUF sihirli numarasi.\n");
         return NULL;
     }
-    offset += 4;
+    ofset += 4;
     
-    uint8_t ver_major = decrypted_data[offset++];
-    uint8_t ver_minor = decrypted_data[offset++];
+    uint8_t ver_major = cozulmus_veri[ofset++];
+    uint8_t ver_minor = cozulmus_veri[ofset++];
     
-    uint32_t total_arrays;
-    memcpy(&total_arrays, &decrypted_data[offset], sizeof(uint32_t));
-    offset += 4;
+    uint32_t toplam_diziler;
+    memcpy(&toplam_diziler, &cozulmus_veri[ofset], sizeof(uint32_t));
+    ofset += 4;
     
-    uint64_t total_elements;
-    memcpy(&total_elements, &decrypted_data[offset], sizeof(uint64_t));
-    offset += 8;
+    uint64_t toplam_elemanlar;
+    memcpy(&toplam_elemanlar, &cozulmus_veri[ofset], sizeof(uint64_t));
+    ofset += 8;
     
-    offset += 16;
+    ofset += 16;
     
-    for (uint32_t i = 0; i < total_arrays; i++) {
-        uint8_t ndim = decrypted_data[offset++];
-        offset += ndim * 4;
-        offset += 4;
-        offset += 4;
+    for (uint32_t i = 0; i < toplam_diziler; i++) {
+        uint8_t ndim = cozulmus_veri[ofset++];
+        ofset += ndim * 4;
+        ofset += 4;
+        ofset += 4;
     }
     
-    return (float*)&decrypted_data[offset];
+    return (float*)&cozulmus_veri[ofset];
 }
 
 int main(void) {
     printf("========================================\n");
-    printf("CypherPUF - Faz 3: Embedded AI Inference\n");
-    printf("Developer: Arda Mecik\n");
+    printf("CypherPUF - Faz 3: Gomulu Yapay Zeka Cikarimi\n");
+    printf("Gelistirici: Arda Mecik\n");
     printf("========================================\n");
     
     CypherPUF_Init(CYPHERPUF_BASE_ADDR);
     
-    printf("[1/4] Triggering Hardware PUF Key Generation...\n");
-    bool key_gen_ok = CypherPUF_GenerateKey();
-    if (!key_gen_ok) {
-        printf("ERROR: PUF key generation failed or timed out.\n");
+    printf("[1/4] Donanim PUF Anahtar Uretimi Tetikleniyor...\n");
+    bool anahtar_uretimi_tamam = CypherPUF_GenerateKey();
+    if (!anahtar_uretimi_tamam) {
+        printf("HATA: PUF anahtar uretimi basarisiz oldu veya zaman asimina ugradi.\n");
         return -1;
     }
-    printf("      -> PUF Key generated and expanded to AES Round Keys successfully.\n");
+    printf("      -> PUF Anahtari uretildi ve AES Tur Anahtarlarina basariyla genisletildi.\n");
     
-    uint8_t puf_key[32];
-    CypherPUF_GetPUFKey(puf_key);
-    printf("      -> PUF Key (Hex): ");
-    for(int i=0; i<32; i++) printf("%02X", puf_key[i]);
+    uint8_t puf_anahtari[32];
+    CypherPUF_GetPUFKey(puf_anahtari);
+    printf("      -> PUF Anahtari (Hex): ");
+    for(int i=0; i<32; i++) printf("%02X", puf_anahtari[i]);
     printf("\n");
     
-    printf("\n[2/4] Allocating memory for model weights (Size: %u bytes)...\n", ENCRYPTED_DATA_SIZE);
-    uint8_t* decrypted_buffer = (uint8_t*)malloc(ENCRYPTED_DATA_SIZE);
-    if (!decrypted_buffer) {
-        printf("ERROR: Memory allocation failed.\n");
+    printf("\n[2/4] Model agirliklari icin bellek ayriliyor (Boyut: %u bayt)...\n", ENCRYPTED_DATA_SIZE);
+    uint8_t* cozulmus_bellek = (uint8_t*)malloc(ENCRYPTED_DATA_SIZE);
+    if (!cozulmus_bellek) {
+        printf("HATA: Bellek ayirma islemi basarisiz.\n");
         return -1;
     }
     
-    printf("\n[3/4] Decrypting AI Model Weights via Hardware AES-256...\n");
-    CypherPUF_DecryptBuffer(encrypted_weights, decrypted_buffer, ENCRYPTED_DATA_SIZE);
-    printf("      -> Decryption completed.\n");
+    printf("\n[3/4] Yapay Zeka Model Agirliklari Donanim AES-256 ile Cozuluyor...\n");
+    CypherPUF_DecryptBuffer(encrypted_weights, cozulmus_bellek, ENCRYPTED_DATA_SIZE);
+    printf("      -> Sifre cozme islemi tamamlandi.\n");
     
-    float* raw_weights = Parse_CPUF_Binary(decrypted_buffer, ENCRYPTED_DATA_SIZE);
-    if (raw_weights == NULL) {
-        printf("WARNING: Parsing CPUF header failed. (Expected if running in simulation with dummy weights)\n");
+    float* ham_agirliklar = Parse_CPUF_Binary(cozulmus_bellek, ENCRYPTED_DATA_SIZE);
+    if (ham_agirliklar == NULL) {
+        printf("UYARI: CPUF basligi ayristirildi. (Sahte agirliklarla simulasyonda calisiyorsa beklenir)\n");
         #if XILINX_BAREMETAL_SIM
-            raw_weights = (float*)decrypted_buffer; 
+            ham_agirliklar = (float*)cozulmus_bellek; 
         #else
-            free(decrypted_buffer);
+            free(cozulmus_bellek);
             return -1;
         #endif
     } else {
-        printf("      -> CPUF Binary parsed. Weight data extracted successfully.\n");
+        printf("      -> CPUF Ikilisi ayristirildi. Agirlik verisi basariyla cikarildi.\n");
     }
     
-    printf("\n[4/4] Executing AI Inference Forward-Pass on ARM Cortex-A...\n");
-    float output_probs[10] = {0.0f};
+    printf("\n[4/4] ARM Cortex-A Uzerinde Yapay Zeka Cikarim Ileri Beslemesi Calistiriliyor...\n");
+    float cikis_olasiliklari[10] = {0.0f};
     
     #if XILINX_BAREMETAL_SIM
-        printf("      -> Skipping full inference execution in simulator to prevent segmentation fault due to dummy weights.\n");
-        output_probs[0] = 0.95f;
+        printf("      -> Sahte agirliklar nedeniyle bellek erisim hatasini onlemek icin simulasyonda tam cikarim atlandi.\n");
+        cikis_olasiliklari[0] = 0.95f;
     #else
-        Run_CypherPUF_CNN(test_image_cifar10, raw_weights, output_probs);
+        Run_CypherPUF_CNN(test_image_cifar10, ham_agirliklar, cikis_olasiliklari);
     #endif
     
-    printf("\nInference Results (Softmax Probabilities):\n");
-    int max_class = 0;
-    float max_prob = 0.0f;
+    printf("\nCikarim Sonuclari (Softmax Olasiliklari):\n");
+    int en_yuksek_sinif = 0;
+    float en_yuksek_olasilik = 0.0f;
     for (int i = 0; i < 10; i++) {
-        printf("  Class %d: %.4f\n", i, output_probs[i]);
-        if (output_probs[i] > max_prob) {
-            max_prob = output_probs[i];
-            max_class = i;
+        printf("  Sinif %d: %.4f\n", i, cikis_olasiliklari[i]);
+        if (cikis_olasiliklari[i] > en_yuksek_olasilik) {
+            en_yuksek_olasilik = cikis_olasiliklari[i];
+            en_yuksek_sinif = i;
         }
     }
     
-    printf("\nPredicted Class: %d (Probability: %.2f%%)\n", max_class, max_prob * 100.0f);
+    printf("\nTahmin Edilen Sinif: %d (Olasilik: %.2f%%)\n", en_yuksek_sinif, en_yuksek_olasilik * 100.0f);
     
-    free(decrypted_buffer);
+    free(cozulmus_bellek);
     
     printf("========================================\n");
-    printf("PHASE 3 COMPLETE: End-to-End Edge AI Flow Verified.\n");
+    printf("FAZ 3 TAMAMLANDI: Uctan Uca Uc Yapay Zeka Akisi Dogrulandi.\n");
     printf("========================================\n");
     
     return 0;
