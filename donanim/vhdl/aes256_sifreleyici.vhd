@@ -1,43 +1,43 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
-use work.aes_pkg.ALL;
+use work.aes_paket.ALL;
 
-entity aes256_cipher is
+entity aes256_sifreleyici is
     port (
         clk             : in  std_logic;
         rst             : in  std_logic;
-        plaintext       : in  std_logic_vector(127 downto 0);
-        round_keys      : in  round_key_array_t;
+        duz_metin       : in  std_logic_vector(127 downto 0);
+        tur_anahtarlari      : in  tur_anahtar_dizisi_t;
         start           : in  std_logic;
-        ciphertext      : out std_logic_vector(127 downto 0);
+        sifreli_metin      : out std_logic_vector(127 downto 0);
         done            : out std_logic;
         busy            : out std_logic
     );
-end entity aes256_cipher;
+end entity aes256_sifreleyici;
 
-architecture rtl of aes256_cipher is
+architecture rtl of aes256_sifreleyici is
 
     type state_t is (IDLE, INIT_ADD_KEY, ROUND_SUB_BYTES, ROUND_SHIFT_ROWS, ROUND_MIX_COLUMNS, ROUND_ADD_KEY, FINAL_SUB_BYTES, FINAL_SHIFT_ROWS, FINAL_ADD_KEY, FINISHED);
     signal fsm_state : state_t;
 
-    signal aes_state : state_array_t;
+    signal aes_state : durum_dizisi_t;
     signal round_num : unsigned(3 downto 0);
 
 begin
 
     process(clk, rst)
-        variable temp_state : state_array_t;
+        variable temp_state : durum_dizisi_t;
         variable t0, t1, t2, t3 : std_logic_vector(7 downto 0);
         variable rk_vec : std_logic_vector(127 downto 0);
-        variable rk_state : state_array_t;
+        variable rk_state : durum_dizisi_t;
     begin
         if rst = '1' then
             fsm_state <= IDLE;
             done <= '0';
             busy <= '0';
             round_num <= (others => '0');
-            ciphertext <= (others => '0');
+            sifreli_metin <= (others => '0');
             for r in 0 to 3 loop
                 for c in 0 to 3 loop
                     aes_state(r, c) <= (others => '0');
@@ -50,15 +50,15 @@ begin
                 when IDLE =>
                     busy <= '0';
                     if start = '1' then
-                        aes_state <= vector_to_state(plaintext);
+                        aes_state <= vektorden_duruma(duz_metin);
                         round_num <= (others => '0');
                         busy <= '1';
                         fsm_state <= INIT_ADD_KEY;
                     end if;
 
                 when INIT_ADD_KEY =>
-                    rk_vec := round_keys(0);
-                    rk_state := vector_to_state(rk_vec);
+                    rk_vec := tur_anahtarlari(0);
+                    rk_state := vektorden_duruma(rk_vec);
                     for r in 0 to 3 loop
                         for c in 0 to 3 loop
                             aes_state(r, c) <= aes_state(r, c) xor rk_state(r, c);
@@ -70,7 +70,7 @@ begin
                 when ROUND_SUB_BYTES =>
                     for r in 0 to 3 loop
                         for c in 0 to 3 loop
-                            aes_state(r, c) <= sub_byte(aes_state(r, c));
+                            aes_state(r, c) <= bayt_degistir(aes_state(r, c));
                         end loop;
                     end loop;
                     fsm_state <= ROUND_SHIFT_ROWS;
@@ -114,8 +114,8 @@ begin
                     fsm_state <= ROUND_ADD_KEY;
 
                 when ROUND_ADD_KEY =>
-                    rk_vec := round_keys(to_integer(round_num));
-                    rk_state := vector_to_state(rk_vec);
+                    rk_vec := tur_anahtarlari(to_integer(round_num));
+                    rk_state := vektorden_duruma(rk_vec);
                     for r in 0 to 3 loop
                         for c in 0 to 3 loop
                             aes_state(r, c) <= aes_state(r, c) xor rk_state(r, c);
@@ -125,8 +125,8 @@ begin
                     fsm_state <= ROUND_SUB_BYTES;
 
                 when FINAL_ADD_KEY =>
-                    rk_vec := round_keys(14);
-                    rk_state := vector_to_state(rk_vec);
+                    rk_vec := tur_anahtarlari(14);
+                    rk_state := vektorden_duruma(rk_vec);
                     for r in 0 to 3 loop
                         for c in 0 to 3 loop
                             aes_state(r, c) <= aes_state(r, c) xor rk_state(r, c);
@@ -141,7 +141,7 @@ begin
                     fsm_state <= IDLE;
 
                 when FINISHED =>
-                    ciphertext <= state_to_vector(aes_state);
+                    sifreli_metin <= durumdan_vektore(aes_state);
                     done <= '1';
                     busy <= '0';
                     fsm_state <= IDLE;

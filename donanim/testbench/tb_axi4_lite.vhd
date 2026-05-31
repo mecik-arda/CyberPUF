@@ -1,7 +1,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
-use work.aes_pkg.ALL;
+use work.aes_paket.ALL;
 
 entity tb_axi4_lite is
 end entity tb_axi4_lite;
@@ -39,15 +39,15 @@ architecture sim of tb_axi4_lite is
     signal rvalid      : std_logic;
     signal rready      : std_logic := '1';
 
-    component axi4_lite_wrapper is
+    component axi4_lite_sarmalayici is
         generic (
             C_S_AXI_DATA_WIDTH : integer := 32;
             C_S_AXI_ADDR_WIDTH : integer := 8;
-            NUM_RO_PAIRS       : integer := 16;
-            NUM_INVERTERS      : integer := 3;
-            COUNTER_WIDTH      : integer := 20;
-            COUNT_CYCLES       : integer := 1000;
-            PUF_REPETITIONS    : integer := 16
+            RO_CIFT_SAYISI       : integer := 16;
+            INVERTER_SAYISI      : integer := 3;
+            SAYICI_GENISLIGI      : integer := 20;
+            SAYMA_DONGULERI       : integer := 1000;
+            PUF_TEKRARLARI    : integer := 16
         );
         port (
             S_AXI_ACLK     : in  std_logic;
@@ -114,7 +114,7 @@ architecture sim of tb_axi4_lite is
         signal rvalid_s : in std_logic;
         signal rready_s : out std_logic;
         addr            : in std_logic_vector;
-        data_out        : out std_logic_vector(31 downto 0)
+        veri_cikis        : out std_logic_vector(31 downto 0)
     ) is
     begin
         wait until rising_edge(aclk);
@@ -128,7 +128,7 @@ architecture sim of tb_axi4_lite is
         if rvalid_s /= '1' then
             wait until rvalid_s = '1' and rising_edge(aclk);
         end if;
-        data_out := rdata_s;
+        veri_cikis := rdata_s;
         wait for CLK_PERIOD;
     end procedure;
 
@@ -136,15 +136,15 @@ begin
 
     clk <= not clk after CLK_PERIOD / 2;
 
-    uut: axi4_lite_wrapper
+    uut: axi4_lite_sarmalayici
         generic map (
             C_S_AXI_DATA_WIDTH => C_S_AXI_DATA_WIDTH,
             C_S_AXI_ADDR_WIDTH => C_S_AXI_ADDR_WIDTH,
-            NUM_RO_PAIRS       => 16,
-            NUM_INVERTERS      => 3,
-            COUNTER_WIDTH      => 20,
-            COUNT_CYCLES       => 50,
-            PUF_REPETITIONS    => 3
+            RO_CIFT_SAYISI       => 16,
+            INVERTER_SAYISI      => 3,
+            SAYICI_GENISLIGI      => 20,
+            SAYMA_DONGULERI       => 50,
+            PUF_TEKRARLARI    => 3
         )
         port map (
             S_AXI_ACLK    => clk,

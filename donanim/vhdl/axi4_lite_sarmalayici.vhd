@@ -1,17 +1,17 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
-use work.aes_pkg.ALL;
+use work.aes_paket.ALL;
 
-entity axi4_lite_wrapper is
+entity axi4_lite_sarmalayici is
     generic (
         C_S_AXI_DATA_WIDTH : integer := 32;
         C_S_AXI_ADDR_WIDTH : integer := 8;
-        NUM_RO_PAIRS       : integer := 16;
-        NUM_INVERTERS      : integer := 3;
-        COUNTER_WIDTH      : integer := 20;
-        COUNT_CYCLES       : integer := 1000;
-        PUF_REPETITIONS    : integer := 16
+        RO_CIFT_SAYISI       : integer := 16;
+        INVERTER_SAYISI      : integer := 3;
+        SAYICI_GENISLIGI      : integer := 20;
+        SAYMA_DONGULERI       : integer := 1000;
+        PUF_TEKRARLARI    : integer := 16
     );
     port (
         S_AXI_ACLK     : in  std_logic;
@@ -41,9 +41,9 @@ entity axi4_lite_wrapper is
         S_AXI_RVALID   : out std_logic;
         S_AXI_RREADY   : in  std_logic
     );
-end entity axi4_lite_wrapper;
+end entity axi4_lite_sarmalayici;
 
-architecture rtl of axi4_lite_wrapper is
+architecture rtl of axi4_lite_sarmalayici is
 
     signal axi_awready  : std_logic;
     signal axi_wready   : std_logic;
@@ -82,8 +82,8 @@ architecture rtl of axi4_lite_wrapper is
 
     signal rst_internal    : std_logic;
 
-    signal cmd_generate_key   : std_logic;
-    signal cmd_start_decrypt  : std_logic;
+    signal komut_anahtar_uret   : std_logic;
+    signal komut_sifre_coz_basla  : std_logic;
     signal cmd_generate_key_r : std_logic;
     signal cmd_start_decrypt_r : std_logic;
     signal cmd_generate_key_pulse : std_logic;
@@ -99,38 +99,38 @@ architecture rtl of axi4_lite_wrapper is
     signal core_aes_done    : std_logic;
     signal core_puf_key     : std_logic_vector(255 downto 0);
     signal core_bit_index   : std_logic_vector(8 downto 0);
-    signal core_count_a     : std_logic_vector(COUNTER_WIDTH - 1 downto 0);
-    signal core_count_b     : std_logic_vector(COUNTER_WIDTH - 1 downto 0);
+    signal core_count_a     : std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
+    signal core_count_b     : std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
 
     signal puf_done_sticky  : std_logic;
     signal kexp_done_sticky : std_logic;
     signal aes_done_sticky  : std_logic;
 
-    component cypherpuf_top is
+    component cypherpuf_ust is
         generic (
-            NUM_RO_PAIRS     : integer := 16;
-            NUM_INVERTERS    : integer := 3;
-            COUNTER_WIDTH    : integer := 20;
-            COUNT_CYCLES     : integer := 1000;
-            PUF_REPETITIONS  : integer := 16
+            RO_CIFT_SAYISI     : integer := 16;
+            INVERTER_SAYISI    : integer := 3;
+            SAYICI_GENISLIGI    : integer := 20;
+            SAYMA_DONGULERI     : integer := 1000;
+            PUF_TEKRARLARI  : integer := 16
         );
         port (
             clk                 : in  std_logic;
             rst                 : in  std_logic;
-            cmd_generate_key    : in  std_logic;
-            cmd_start_decrypt   : in  std_logic;
-            data_in             : in  std_logic_vector(127 downto 0);
-            data_out            : out std_logic_vector(127 downto 0);
-            status_puf_busy     : out std_logic;
-            status_puf_done     : out std_logic;
-            status_key_exp_busy : out std_logic;
-            status_key_exp_done : out std_logic;
-            status_aes_busy     : out std_logic;
-            status_aes_done     : out std_logic;
-            debug_puf_key       : out std_logic_vector(255 downto 0);
-            debug_bit_index     : out std_logic_vector(8 downto 0);
-            debug_count_a       : out std_logic_vector(COUNTER_WIDTH - 1 downto 0);
-            debug_count_b       : out std_logic_vector(COUNTER_WIDTH - 1 downto 0)
+            komut_anahtar_uret    : in  std_logic;
+            komut_sifre_coz_basla   : in  std_logic;
+            veri_giris             : in  std_logic_vector(127 downto 0);
+            veri_cikis            : out std_logic_vector(127 downto 0);
+            durum_puf_mesgul     : out std_logic;
+            durum_puf_tamam     : out std_logic;
+            durum_anahtar_gen_mesgul : out std_logic;
+            durum_anahtar_gen_tamam : out std_logic;
+            durum_aes_mesgul     : out std_logic;
+            durum_aes_tamam     : out std_logic;
+            hata_ayiklama_puf_anahtar       : out std_logic_vector(255 downto 0);
+            hata_ayiklama_bit_indeks     : out std_logic_vector(8 downto 0);
+            hata_ayiklama_sayac_a       : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
+            hata_ayiklama_sayac_b       : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0)
         );
     end component;
 
@@ -140,31 +140,31 @@ begin
 
     core_data_in <= reg_data_in_3 & reg_data_in_2 & reg_data_in_1 & reg_data_in_0;
 
-    cypherpuf_core: cypherpuf_top
+    cypherpuf_core: cypherpuf_ust
         generic map (
-            NUM_RO_PAIRS    => NUM_RO_PAIRS,
-            NUM_INVERTERS   => NUM_INVERTERS,
-            COUNTER_WIDTH   => COUNTER_WIDTH,
-            COUNT_CYCLES    => COUNT_CYCLES,
-            PUF_REPETITIONS => PUF_REPETITIONS
+            RO_CIFT_SAYISI    => RO_CIFT_SAYISI,
+            INVERTER_SAYISI   => INVERTER_SAYISI,
+            SAYICI_GENISLIGI   => SAYICI_GENISLIGI,
+            SAYMA_DONGULERI    => SAYMA_DONGULERI,
+            PUF_TEKRARLARI => PUF_TEKRARLARI
         )
         port map (
             clk                 => S_AXI_ACLK,
             rst                 => rst_internal,
-            cmd_generate_key    => cmd_generate_key_pulse,
-            cmd_start_decrypt   => cmd_start_decrypt_pulse,
-            data_in             => core_data_in,
-            data_out            => core_data_out,
-            status_puf_busy     => core_puf_busy,
-            status_puf_done     => core_puf_done,
-            status_key_exp_busy => core_kexp_busy,
-            status_key_exp_done => core_kexp_done,
-            status_aes_busy     => core_aes_busy,
-            status_aes_done     => core_aes_done,
-            debug_puf_key       => core_puf_key,
-            debug_bit_index     => core_bit_index,
-            debug_count_a       => core_count_a,
-            debug_count_b       => core_count_b
+            komut_anahtar_uret    => cmd_generate_key_pulse,
+            komut_sifre_coz_basla   => cmd_start_decrypt_pulse,
+            veri_giris             => core_data_in,
+            veri_cikis            => core_data_out,
+            durum_puf_mesgul     => core_puf_busy,
+            durum_puf_tamam     => core_puf_done,
+            durum_anahtar_gen_mesgul => core_kexp_busy,
+            durum_anahtar_gen_tamam => core_kexp_done,
+            durum_aes_mesgul     => core_aes_busy,
+            durum_aes_tamam     => core_aes_done,
+            hata_ayiklama_puf_anahtar       => core_puf_key,
+            hata_ayiklama_bit_indeks     => core_bit_index,
+            hata_ayiklama_sayac_a       => core_count_a,
+            hata_ayiklama_sayac_b       => core_count_b
         );
 
     process(S_AXI_ACLK)
@@ -232,10 +232,10 @@ begin
     reg_puf_key_6 <= core_puf_key(223 downto 192);
     reg_puf_key_7 <= core_puf_key(255 downto 224);
 
-    reg_debug_0(COUNTER_WIDTH - 1 downto 0) <= core_count_a;
-    reg_debug_0(31 downto COUNTER_WIDTH) <= (others => '0');
-    reg_debug_1(COUNTER_WIDTH - 1 downto 0) <= core_count_b;
-    reg_debug_1(31 downto COUNTER_WIDTH) <= (others => '0');
+    reg_debug_0(SAYICI_GENISLIGI - 1 downto 0) <= core_count_a;
+    reg_debug_0(31 downto SAYICI_GENISLIGI) <= (others => '0');
+    reg_debug_1(SAYICI_GENISLIGI - 1 downto 0) <= core_count_b;
+    reg_debug_1(31 downto SAYICI_GENISLIGI) <= (others => '0');
 
     S_AXI_AWREADY <= axi_awready;
     S_AXI_WREADY  <= axi_wready;

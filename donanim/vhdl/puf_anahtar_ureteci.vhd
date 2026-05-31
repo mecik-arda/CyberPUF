@@ -2,29 +2,29 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity puf_key_generator is
+entity puf_anahtar_ureteci is
     generic (
         KEY_WIDTH        : integer := 256;
-        NUM_RO_PAIRS     : integer := 16;
-        NUM_INVERTERS    : integer := 3;
-        COUNTER_WIDTH    : integer := 20;
-        COUNT_CYCLES     : integer := 1000;
+        RO_CIFT_SAYISI     : integer := 16;
+        INVERTER_SAYISI    : integer := 3;
+        SAYICI_GENISLIGI    : integer := 20;
+        SAYMA_DONGULERI     : integer := 1000;
         REPETITIONS      : integer := 16
     );
     port (
         clk             : in  std_logic;
         rst             : in  std_logic;
-        generate_key    : in  std_logic;
-        puf_key         : out std_logic_vector(KEY_WIDTH - 1 downto 0);
-        key_valid       : out std_logic;
+        anahtar_uret    : in  std_logic;
+        puf_anahtar         : out std_logic_vector(KEY_WIDTH - 1 downto 0);
+        anahtar_gecerli       : out std_logic;
         busy            : out std_logic;
-        bit_index_out   : out std_logic_vector(8 downto 0);
-        debug_count_a   : out std_logic_vector(COUNTER_WIDTH - 1 downto 0);
-        debug_count_b   : out std_logic_vector(COUNTER_WIDTH - 1 downto 0)
+        bit_indeks_cikis   : out std_logic_vector(8 downto 0);
+        hata_ayiklama_sayac_a   : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
+        hata_ayiklama_sayac_b   : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0)
     );
-end entity puf_key_generator;
+end entity puf_anahtar_ureteci;
 
-architecture rtl of puf_key_generator is
+architecture rtl of puf_anahtar_ureteci is
 
     type state_t is (
         IDLE,
@@ -40,9 +40,9 @@ architecture rtl of puf_key_generator is
     signal puf_challenge   : std_logic_vector(3 downto 0);
     signal puf_response    : std_logic;
     signal puf_valid       : std_logic;
-    signal puf_busy        : std_logic;
-    signal puf_count_a     : std_logic_vector(COUNTER_WIDTH - 1 downto 0);
-    signal puf_count_b     : std_logic_vector(COUNTER_WIDTH - 1 downto 0);
+    signal puf_mesgul        : std_logic;
+    signal puf_count_a     : std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
+    signal puf_count_b     : std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
 
     signal key_reg         : std_logic_vector(KEY_WIDTH - 1 downto 0);
     signal bit_counter     : unsigned(8 downto 0);
@@ -51,12 +51,12 @@ architecture rtl of puf_key_generator is
 
     signal accumulated_bit : unsigned(4 downto 0);
 
-    component ro_puf_core is
+    component ro_puf_cekirdek is
         generic (
-            NUM_RO_PAIRS     : integer := 16;
-            NUM_INVERTERS    : integer := 3;
-            COUNTER_WIDTH    : integer := 20;
-            COUNT_CYCLES     : integer := 1000
+            RO_CIFT_SAYISI     : integer := 16;
+            INVERTER_SAYISI    : integer := 3;
+            SAYICI_GENISLIGI    : integer := 20;
+            SAYMA_DONGULERI     : integer := 1000
         );
         port (
             clk             : in  std_logic;
@@ -66,19 +66,19 @@ architecture rtl of puf_key_generator is
             response_bit    : out std_logic;
             response_valid  : out std_logic;
             busy            : out std_logic;
-            ro_count_a      : out std_logic_vector(COUNTER_WIDTH - 1 downto 0);
-            ro_count_b      : out std_logic_vector(COUNTER_WIDTH - 1 downto 0)
+            ro_count_a      : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
+            ro_count_b      : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0)
         );
     end component;
 
 begin
 
-    puf_inst: ro_puf_core
+    puf_inst: ro_puf_cekirdek
         generic map (
-            NUM_RO_PAIRS  => NUM_RO_PAIRS,
-            NUM_INVERTERS => NUM_INVERTERS,
-            COUNTER_WIDTH => COUNTER_WIDTH,
-            COUNT_CYCLES  => COUNT_CYCLES
+            RO_CIFT_SAYISI  => RO_CIFT_SAYISI,
+            INVERTER_SAYISI => INVERTER_SAYISI,
+            SAYICI_GENISLIGI => SAYICI_GENISLIGI,
+            SAYMA_DONGULERI  => SAYMA_DONGULERI
         )
         port map (
             clk           => clk,
@@ -87,14 +87,14 @@ begin
             challenge     => puf_challenge,
             response_bit  => puf_response,
             response_valid => puf_valid,
-            busy          => puf_busy,
+            busy          => puf_mesgul,
             ro_count_a    => puf_count_a,
             ro_count_b    => puf_count_b
         );
 
-    debug_count_a <= puf_count_a;
-    debug_count_b <= puf_count_b;
-    bit_index_out <= std_logic_vector(bit_counter);
+    hata_ayiklama_sayac_a <= puf_count_a;
+    hata_ayiklama_sayac_b <= puf_count_b;
+    bit_indeks_cikis <= std_logic_vector(bit_counter);
 
     process(clk, rst)
         variable majority_result : std_logic;
@@ -102,8 +102,8 @@ begin
         if rst = '1' then
             state <= IDLE;
             key_reg <= (others => '0');
-            puf_key <= (others => '0');
-            key_valid <= '0';
+            puf_anahtar <= (others => '0');
+            anahtar_gecerli <= '0';
             busy <= '0';
             puf_start <= '0';
             puf_challenge <= (others => '0');
@@ -113,12 +113,12 @@ begin
             accumulated_bit <= (others => '0');
         elsif rising_edge(clk) then
             puf_start <= '0';
-            key_valid <= '0';
+            anahtar_gecerli <= '0';
 
             case state is
                 when IDLE =>
                     busy <= '0';
-                    if generate_key = '1' then
+                    if anahtar_uret = '1' then
                         key_reg <= (others => '0');
                         bit_counter <= (others => '0');
                         challenge_idx <= (others => '0');
@@ -167,7 +167,7 @@ begin
                     else
                         bit_counter <= bit_counter + 1;
 
-                        if challenge_idx = to_unsigned(NUM_RO_PAIRS - 1, 4) then
+                        if challenge_idx = to_unsigned(RO_CIFT_SAYISI - 1, 4) then
                             challenge_idx <= (others => '0');
                         else
                             challenge_idx <= challenge_idx + 1;
@@ -177,8 +177,8 @@ begin
                     end if;
 
                 when KEY_READY =>
-                    puf_key <= key_reg;
-                    key_valid <= '1';
+                    puf_anahtar <= key_reg;
+                    anahtar_gecerli <= '1';
                     busy <= '0';
                     state <= IDLE;
 

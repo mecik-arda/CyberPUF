@@ -1,22 +1,22 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
-use work.aes_pkg.ALL;
+use work.aes_paket.ALL;
 
-entity aes256_decryption is
+entity aes256_sifre_cozme is
     port (
         clk             : in  std_logic;
         rst             : in  std_logic;
-        ciphertext      : in  std_logic_vector(127 downto 0);
-        round_keys      : in  round_key_array_t;
+        sifreli_metin      : in  std_logic_vector(127 downto 0);
+        tur_anahtarlari      : in  tur_anahtar_dizisi_t;
         start           : in  std_logic;
-        plaintext       : out std_logic_vector(127 downto 0);
+        duz_metin       : out std_logic_vector(127 downto 0);
         done            : out std_logic;
         busy            : out std_logic
     );
-end entity aes256_decryption;
+end entity aes256_sifre_cozme;
 
-architecture rtl of aes256_decryption is
+architecture rtl of aes256_sifre_cozme is
 
     type state_t is (
         IDLE,
@@ -32,23 +32,23 @@ architecture rtl of aes256_decryption is
     );
     signal fsm_state : state_t;
 
-    signal aes_state : state_array_t;
+    signal aes_state : durum_dizisi_t;
     signal round_num : unsigned(3 downto 0);
 
 begin
 
     process(clk, rst)
-        variable temp_state : state_array_t;
+        variable temp_state : durum_dizisi_t;
         variable t0, t1, t2, t3 : std_logic_vector(7 downto 0);
         variable rk_vec : std_logic_vector(127 downto 0);
-        variable rk_state : state_array_t;
+        variable rk_state : durum_dizisi_t;
     begin
         if rst = '1' then
             fsm_state <= IDLE;
             done <= '0';
             busy <= '0';
             round_num <= (others => '0');
-            plaintext <= (others => '0');
+            duz_metin <= (others => '0');
             for r in 0 to 3 loop
                 for c in 0 to 3 loop
                     aes_state(r, c) <= (others => '0');
@@ -61,15 +61,15 @@ begin
                 when IDLE =>
                     busy <= '0';
                     if start = '1' then
-                        aes_state <= vector_to_state(ciphertext);
+                        aes_state <= vektorden_duruma(sifreli_metin);
                         round_num <= to_unsigned(14, 4);
                         busy <= '1';
                         fsm_state <= INIT_ADD_KEY;
                     end if;
 
                 when INIT_ADD_KEY =>
-                    rk_vec := round_keys(14);
-                    rk_state := vector_to_state(rk_vec);
+                    rk_vec := tur_anahtarlari(14);
+                    rk_state := vektorden_duruma(rk_vec);
                     for r in 0 to 3 loop
                         for c in 0 to 3 loop
                             aes_state(r, c) <= aes_state(r, c) xor rk_state(r, c);
@@ -101,14 +101,14 @@ begin
                 when INV_SUB_BYTES =>
                     for r in 0 to 3 loop
                         for c in 0 to 3 loop
-                            aes_state(r, c) <= inv_sub_byte(aes_state(r, c));
+                            aes_state(r, c) <= ters_bayt_degistir(aes_state(r, c));
                         end loop;
                     end loop;
                     fsm_state <= INV_ADD_KEY;
 
                 when INV_ADD_KEY =>
-                    rk_vec := round_keys(to_integer(round_num));
-                    rk_state := vector_to_state(rk_vec);
+                    rk_vec := tur_anahtarlari(to_integer(round_num));
+                    rk_state := vektorden_duruma(rk_vec);
                     for r in 0 to 3 loop
                         for c in 0 to 3 loop
                             aes_state(r, c) <= aes_state(r, c) xor rk_state(r, c);
@@ -128,10 +128,10 @@ begin
                         t2 := aes_state(2, c);
                         t3 := aes_state(3, c);
 
-                        aes_state(0, c) <= gf_mult(t0, 14) xor gf_mult(t1, 11) xor gf_mult(t2, 13) xor gf_mult(t3, 9);
-                        aes_state(1, c) <= gf_mult(t0, 9)  xor gf_mult(t1, 14) xor gf_mult(t2, 11) xor gf_mult(t3, 13);
-                        aes_state(2, c) <= gf_mult(t0, 13) xor gf_mult(t1, 9)  xor gf_mult(t2, 14) xor gf_mult(t3, 11);
-                        aes_state(3, c) <= gf_mult(t0, 11) xor gf_mult(t1, 13) xor gf_mult(t2, 9)  xor gf_mult(t3, 14);
+                        aes_state(0, c) <= gf_carpim(t0, 14) xor gf_carpim(t1, 11) xor gf_carpim(t2, 13) xor gf_carpim(t3, 9);
+                        aes_state(1, c) <= gf_carpim(t0, 9)  xor gf_carpim(t1, 14) xor gf_carpim(t2, 11) xor gf_carpim(t3, 13);
+                        aes_state(2, c) <= gf_carpim(t0, 13) xor gf_carpim(t1, 9)  xor gf_carpim(t2, 14) xor gf_carpim(t3, 11);
+                        aes_state(3, c) <= gf_carpim(t0, 11) xor gf_carpim(t1, 13) xor gf_carpim(t2, 9)  xor gf_carpim(t3, 14);
                     end loop;
 
                     round_num <= round_num - 1;
@@ -147,7 +147,7 @@ begin
                     fsm_state <= IDLE;
 
                 when FINISHED =>
-                    plaintext <= state_to_vector(aes_state);
+                    duz_metin <= durumdan_vektore(aes_state);
                     done <= '1';
                     busy <= '0';
                     fsm_state <= IDLE;

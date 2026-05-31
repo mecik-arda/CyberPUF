@@ -2,19 +2,19 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-package aes_pkg is
+package aes_paket is
 
-    type state_array_t is array (0 to 3, 0 to 3) of std_logic_vector(7 downto 0);
+    type durum_dizisi_t is array (0 to 3, 0 to 3) of std_logic_vector(7 downto 0);
 
-    type round_key_array_t is array (0 to 14) of std_logic_vector(127 downto 0);
+    type tur_anahtar_dizisi_t is array (0 to 14) of std_logic_vector(127 downto 0);
 
-    type word_array_t is array (natural range <>) of std_logic_vector(31 downto 0);
+    type kelime_dizisi_t is array (natural range <>) of std_logic_vector(31 downto 0);
 
-    type sbox_array_t is array (0 to 255) of std_logic_vector(7 downto 0);
+    type sbox_dizisi_t is array (0 to 255) of std_logic_vector(7 downto 0);
 
-    type rcon_array_t is array (1 to 10) of std_logic_vector(7 downto 0);
+    type rcon_dizisi_t is array (1 to 10) of std_logic_vector(7 downto 0);
 
-    constant SBOX : sbox_array_t := (
+    constant SBOX : sbox_dizisi_t := (
         x"63", x"7C", x"77", x"7B", x"F2", x"6B", x"6F", x"C5",
         x"30", x"01", x"67", x"2B", x"FE", x"D7", x"AB", x"76",
         x"CA", x"82", x"C9", x"7D", x"FA", x"59", x"47", x"F0",
@@ -49,7 +49,7 @@ package aes_pkg is
         x"41", x"99", x"2D", x"0F", x"B0", x"54", x"BB", x"16"
     );
 
-    constant INV_SBOX : sbox_array_t := (
+    constant INV_SBOX : sbox_dizisi_t := (
         x"52", x"09", x"6A", x"D5", x"30", x"36", x"A5", x"38",
         x"BF", x"40", x"A3", x"9E", x"81", x"F3", x"D7", x"FB",
         x"7C", x"E3", x"39", x"82", x"9B", x"2F", x"FF", x"87",
@@ -84,45 +84,45 @@ package aes_pkg is
         x"E1", x"69", x"14", x"63", x"55", x"21", x"0C", x"7D"
     );
 
-    constant RCON : rcon_array_t := (
+    constant RCON : rcon_dizisi_t := (
         x"01", x"02", x"04", x"08", x"10",
         x"20", x"40", x"80", x"1B", x"36"
     );
 
-    function sub_byte(b : std_logic_vector(7 downto 0)) return std_logic_vector;
-    function inv_sub_byte(b : std_logic_vector(7 downto 0)) return std_logic_vector;
-    function sub_word(w : std_logic_vector(31 downto 0)) return std_logic_vector;
-    function rot_word(w : std_logic_vector(31 downto 0)) return std_logic_vector;
+    function bayt_degistir(b : std_logic_vector(7 downto 0)) return std_logic_vector;
+    function ters_bayt_degistir(b : std_logic_vector(7 downto 0)) return std_logic_vector;
+    function kelime_degistir(w : std_logic_vector(31 downto 0)) return std_logic_vector;
+    function kelime_dondur(w : std_logic_vector(31 downto 0)) return std_logic_vector;
     function xtime(b : std_logic_vector(7 downto 0)) return std_logic_vector;
-    function gf_mult(a : std_logic_vector(7 downto 0); b : integer) return std_logic_vector;
-    function vector_to_state(v : std_logic_vector(127 downto 0)) return state_array_t;
-    function state_to_vector(s : state_array_t) return std_logic_vector;
+    function gf_carpim(a : std_logic_vector(7 downto 0); b : integer) return std_logic_vector;
+    function vektorden_duruma(v : std_logic_vector(127 downto 0)) return durum_dizisi_t;
+    function durumdan_vektore(s : durum_dizisi_t) return std_logic_vector;
 
-end package aes_pkg;
+end package aes_paket;
 
-package body aes_pkg is
+package body aes_paket is
 
-    function sub_byte(b : std_logic_vector(7 downto 0)) return std_logic_vector is
+    function bayt_degistir(b : std_logic_vector(7 downto 0)) return std_logic_vector is
     begin
         return SBOX(to_integer(unsigned(b)));
     end function;
 
-    function inv_sub_byte(b : std_logic_vector(7 downto 0)) return std_logic_vector is
+    function ters_bayt_degistir(b : std_logic_vector(7 downto 0)) return std_logic_vector is
     begin
         return INV_SBOX(to_integer(unsigned(b)));
     end function;
 
-    function sub_word(w : std_logic_vector(31 downto 0)) return std_logic_vector is
+    function kelime_degistir(w : std_logic_vector(31 downto 0)) return std_logic_vector is
         variable result : std_logic_vector(31 downto 0);
     begin
-        result(31 downto 24) := sub_byte(w(31 downto 24));
-        result(23 downto 16) := sub_byte(w(23 downto 16));
-        result(15 downto 8)  := sub_byte(w(15 downto 8));
-        result(7 downto 0)   := sub_byte(w(7 downto 0));
+        result(31 downto 24) := bayt_degistir(w(31 downto 24));
+        result(23 downto 16) := bayt_degistir(w(23 downto 16));
+        result(15 downto 8)  := bayt_degistir(w(15 downto 8));
+        result(7 downto 0)   := bayt_degistir(w(7 downto 0));
         return result;
     end function;
 
-    function rot_word(w : std_logic_vector(31 downto 0)) return std_logic_vector is
+    function kelime_dondur(w : std_logic_vector(31 downto 0)) return std_logic_vector is
     begin
         return w(23 downto 0) & w(31 downto 24);
     end function;
@@ -137,7 +137,7 @@ package body aes_pkg is
         return result;
     end function;
 
-    function gf_mult(a : std_logic_vector(7 downto 0); b : integer) return std_logic_vector is
+    function gf_carpim(a : std_logic_vector(7 downto 0); b : integer) return std_logic_vector is
         variable p : std_logic_vector(7 downto 0);
         variable xt : std_logic_vector(7 downto 0);
         variable xt2 : std_logic_vector(7 downto 0);
@@ -169,8 +169,8 @@ package body aes_pkg is
         return p;
     end function;
 
-    function vector_to_state(v : std_logic_vector(127 downto 0)) return state_array_t is
-        variable s : state_array_t;
+    function vektorden_duruma(v : std_logic_vector(127 downto 0)) return durum_dizisi_t is
+        variable s : durum_dizisi_t;
     begin
         s(0, 0) := v(127 downto 120);
         s(1, 0) := v(119 downto 112);
@@ -191,7 +191,7 @@ package body aes_pkg is
         return s;
     end function;
 
-    function state_to_vector(s : state_array_t) return std_logic_vector is
+    function durumdan_vektore(s : durum_dizisi_t) return std_logic_vector is
         variable v : std_logic_vector(127 downto 0);
     begin
         v(127 downto 120) := s(0, 0);
@@ -213,4 +213,4 @@ package body aes_pkg is
         return v;
     end function;
 
-end package body aes_pkg;
+end package body aes_paket;
