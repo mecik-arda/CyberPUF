@@ -28,12 +28,20 @@ architecture rtl of aes256_sifre_cozme is
         FINAL_INV_SHIFT_ROWS,
         FINAL_INV_SUB_BYTES,
         FINAL_ADD_KEY,
+        RANDOM_STALL,
         FINISHED
     );
     signal fsm_state : state_t;
 
     signal aes_state : durum_dizisi_t;
     signal round_num : unsigned(3 downto 0);
+
+    -- SCA Countermeasures (Side-Channel Attack)
+    signal lfsr_reg : std_logic_vector(15 downto 0) := x"ACE1";
+    signal noise_reg : std_logic_vector(31 downto 0) := (others => '0');
+    attribute keep : string;
+    attribute keep of noise_reg : signal is "true";
+    signal stall_count : unsigned(1 downto 0) := "00";
 
 begin
 
@@ -49,12 +57,23 @@ begin
             busy <= '0';
             round_num <= (others => '0');
             duz_metin <= (others => '0');
+            lfsr_reg <= x"ACE1";
+            noise_reg <= (others => '0');
+            stall_count <= "00";
             for r in 0 to 3 loop
                 for c in 0 to 3 loop
                     aes_state(r, c) <= (others => '0');
                 end loop;
             end loop;
         elsif rising_edge(clk) then
+            -- LFSR (16-bit Galois, taps: 16,14,13,11)
+            lfsr_reg <= lfsr_reg(14 downto 0) & (lfsr_reg(15) xor lfsr_reg(13) xor lfsr_reg(12) xor lfsr_reg(10));
+
+            -- Dummy Power Noise (tek atama ile birlestirildi)
+            noise_reg(31 downto 16) <= noise_reg(30 downto 16) & lfsr_reg(15);
+            noise_reg(15 downto 8)  <= noise_reg(14 downto 8) & lfsr_reg(0);
+            noise_reg(7 downto 0)   <= noise_reg(7 downto 0) xor lfsr_reg(7 downto 0);
+
             done <= '0';
 
             case fsm_state is
@@ -118,7 +137,16 @@ begin
                     if round_num = to_unsigned(0, 4) then
                         fsm_state <= FINISHED;
                     else
+                        stall_count <= unsigned(lfsr_reg(1 downto 0));
+                        fsm_state <= RANDOM_STALL;
+                    end if;
+
+                when RANDOM_STALL =>
+                    if stall_count = "00" then
                         fsm_state <= INV_MIX_COLUMNS;
+                    else
+                        stall_count <= stall_count - 1;
+                        fsm_state <= RANDOM_STALL;
                     end if;
 
                 when INV_MIX_COLUMNS =>
