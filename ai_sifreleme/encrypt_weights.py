@@ -28,6 +28,9 @@ def derive_key_from_puf_simulation(raw_puf_key):
 
 
 def encrypt_aes256_gcm(plaintext_data, aes_key):
+    if len(aes_key) != 32:
+        raise ValueError("AES anahtari 32 byte (256-bit) olmalidir.")
+        
     nonce = secrets.token_bytes(12)
 
     cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
@@ -38,6 +41,9 @@ def encrypt_aes256_gcm(plaintext_data, aes_key):
 
 
 def encrypt_aes256_cbc(plaintext_data, aes_key):
+    if len(aes_key) != 32:
+        raise ValueError("AES anahtari 32 byte (256-bit) olmalidir.")
+        
     iv = secrets.token_bytes(16)
 
     cipher = AES.new(aes_key, AES.MODE_CBC, iv=iv)
