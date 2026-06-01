@@ -1,6 +1,6 @@
 #include "cypherpuf_dsk.h"
 #include "platform_yapilandirmasi.h"
-#include <stdio.h>
+#include "xil_printf.h"
 #include <string.h>
 
 static uint32_t base_addr = CYPHERPUF_TABAN_ADRES;
@@ -104,7 +104,7 @@ void CypherPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, 
     
     uint32_t remainder = boyut_bayt % 16;
     if (remainder != 0) {
-        printf("UYARI: Sifreli metin boyutu (%u) 16'nin kati degil. Son %u bayt isleniyor.\n", boyut_bayt, remainder);
+        xil_printf("UYARI: Sifreli metin boyutu (%u) 16'nin kati degil. Son %u bayt isleniyor.\n", boyut_bayt, remainder);
         uint8_t temp_sifreli[16] = {0};
         uint8_t temp_duz[16] = {0};
         memcpy(temp_sifreli, &sifreli_metin[blocks * 16], remainder);

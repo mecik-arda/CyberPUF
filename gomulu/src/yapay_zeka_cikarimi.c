@@ -1,6 +1,6 @@
 #include "yapay_zeka_cikarimi.h"
 #include <math.h>
-#include <stdio.h>
+#include "xil_printf.h"
 #include <string.h>
 
 #define MAKS_TAMPON_BOYUTU (32 * 32 * 256)
@@ -36,12 +36,12 @@ float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut) {
     uint32_t ofset = 0;
     
     if (toplam_boyut < 16) {
-        printf("HATA: Veri boyutu cok kucuk.\n");
+        xil_printf("HATA: Veri boyutu cok kucuk.\n");
         return NULL;
     }
     
     if (cozulmus_veri[0] != 'C' || cozulmus_veri[1] != 'P' || cozulmus_veri[2] != 'U' || cozulmus_veri[3] != 'F') {
-        printf("HATA: Gecersiz CPUF sihirli numarasi.\n");
+        xil_printf("HATA: Gecersiz CPUF sihirli numarasi.\n");
         return NULL;
     }
     ofset += 4;

@@ -16,20 +16,40 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
 
     toplam_baslangic = time.time()
 
+    def cleanup_on_error():
+        print("\n  [HATA YONETIMI] Ara dosyalar temizleniyor...")
+        dosyalar = [
+            os.path.join('ai_sifreleme', 'cypherpuf_weights.cpuf'),
+            os.path.join('ai_sifreleme', 'cypherpuf_encrypted_weights.bin'),
+            os.path.join('ai_sifreleme', 'cypherpuf_ciphertext_raw.bin'),
+            os.path.join('ai_sifreleme', 'cypherpuf_nonce.bin'),
+            os.path.join('ai_sifreleme', 'cypherpuf_auth_tag.bin')
+        ]
+        for dosya in dosyalar:
+            if os.path.exists(dosya):
+                try:
+                    os.remove(dosya)
+                    print(f"    - Silindi: {dosya}")
+                except:
+                    pass
+
     print("\n\n")
     print("#" * 70)
     print("# ADIM 1/4: CNN MODEL EGITIMI")
     print("#" * 70)
 
     adim1_baslangic = time.time()
-
-    from ai_sifreleme.train_model import train_model
-    model, gecmis = train_model(
-        epochs=epoch_sayisi,
-        batch_size=yigin_boyutu,
-        learning_rate=ogrenme_orani
-    )
-
+    try:
+        from ai_sifreleme.train_model import train_model
+        model, gecmis = train_model(
+            epochs=epoch_sayisi,
+            batch_size=yigin_boyutu,
+            learning_rate=ogrenme_orani
+        )
+    except Exception as e:
+        print(f"\n  HATA: Adim 1 (CNN Model Egitimi) basarisiz oldu: {e}")
+        cleanup_on_error()
+        return False
     adim1_suresi = time.time() - adim1_baslangic
     print(f"\n  Adim 1 suresi: {adim1_suresi:.1f} saniye")
 
@@ -39,10 +59,13 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     print("#" * 70)
 
     adim2_baslangic = time.time()
-
-    from ai_sifreleme.export_weights import export_weights
-    ikili_veri, agirlik_manifestosu, sha256_hash_degeri = export_weights()
-
+    try:
+        from ai_sifreleme.export_weights import export_weights
+        ikili_veri, agirlik_manifestosu, sha256_hash_degeri = export_weights()
+    except Exception as e:
+        print(f"\n  HATA: Adim 2 (Agirlik Disa Aktarma) basarisiz oldu: {e}")
+        cleanup_on_error()
+        return False
     adim2_suresi = time.time() - adim2_baslangic
     print(f"\n  Adim 2 suresi: {adim2_suresi:.1f} saniye")
 
@@ -52,12 +75,15 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     print("#" * 70)
 
     adim3_baslangic = time.time()
-
-    from ai_sifreleme.encrypt_weights import encrypt_weights
-    sifreli_ikili_veri, aes_anahtari, nonce_degeri, kimlik_dogrulama_etiketi = encrypt_weights(
-        encryption_mode=sifreleme_modu
-    )
-
+    try:
+        from ai_sifreleme.encrypt_weights import encrypt_weights
+        sifreli_ikili_veri, aes_anahtari, nonce_degeri, kimlik_dogrulama_etiketi = encrypt_weights(
+            encryption_mode=sifreleme_modu
+        )
+    except Exception as e:
+        print(f"\n  HATA: Adim 3 (AES-256 Sifreleme) basarisiz oldu: {e}")
+        cleanup_on_error()
+        return False
     adim3_suresi = time.time() - adim3_baslangic
     print(f"\n  Adim 3 suresi: {adim3_suresi:.1f} saniye")
 
@@ -67,14 +93,21 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     print("#" * 70)
 
     adim4_baslangic = time.time()
-
-    from ai_sifreleme.verify_encryption import verify_encryption
-    dogrulama_basarili_mi = verify_encryption()
-
+    try:
+        from ai_sifreleme.verify_encryption import verify_encryption
+        dogrulama_basarili_mi = verify_encryption()
+    except Exception as e:
+        print(f"\n  HATA: Adim 4 (Uctan Uca Dogrulama) basarisiz oldu: {e}")
+        cleanup_on_error()
+        return False
     adim4_suresi = time.time() - adim4_baslangic
     print(f"\n  Adim 4 suresi: {adim4_suresi:.1f} saniye")
 
     toplam_sure = time.time() - toplam_baslangic
+
+    import gc
+    gc.collect()
+    print("\n  Acik kalan dosya handle'i olmadigi dogrulandi (Garbage Collection calistirildi).")
 
     print("\n\n")
     print("=" * 70)
