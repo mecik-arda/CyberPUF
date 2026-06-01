@@ -47,3 +47,6 @@ set_property LOC SLICE_X7Y0 [get_cells -hierarchical -filter {NAME =~ *gen_ro[28
 set_property LOC SLICE_X7Y1 [get_cells -hierarchical -filter {NAME =~ *gen_ro[29].ro_inst*}]
 set_property LOC SLICE_X7Y2 [get_cells -hierarchical -filter {NAME =~ *gen_ro[30].ro_inst*}]
 set_property LOC SLICE_X7Y3 [get_cells -hierarchical -filter {NAME =~ *gen_ro[31].ro_inst*}]
+
+set_property ASYNC_REG true [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_a_sync_reg[*]}]
+set_property ASYNC_REG true [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_b_sync_reg[*]}]

@@ -144,6 +144,10 @@ int main(void) {
 
     xil_printf("3. Cikarim (Reconstruction) Asamasi...\n");
     int duzeltilen_hata = FuzzyExtractor_Cikarim(gurultulu_puf_anahtari, &yardimci_veri, gercek_anahtar_cikarim);
+    if (duzeltilen_hata == -1) {
+        xil_printf("HATA: Cift bit hatasi tespit edildi, guvenli anahtar olusturulamadi.\n");
+        return -1;
+    }
     xil_printf("   -> Cikarim Sonucu Uretilen Anahtar: ");
     for(int i=0; i<32; i++) xil_printf("%02X", gercek_anahtar_cikarim[i]);
     xil_printf("\n   -> Toplam duzeltilen bit hatasi: %d\n", duzeltilen_hata);
