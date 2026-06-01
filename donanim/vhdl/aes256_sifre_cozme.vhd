@@ -83,6 +83,14 @@ begin
                         aes_state <= vektorden_duruma(sifreli_metin);
                         round_num <= to_unsigned(14, 4);
                         busy <= '1';
+                        
+                        -- LFSR seed'ini PUF entropisiyle baslat
+                        if tur_anahtarlari(0)(15 downto 0) = x"0000" then
+                            lfsr_reg <= x"ACE1";
+                        else
+                            lfsr_reg <= tur_anahtarlari(0)(15 downto 0);
+                        end if;
+                        
                         fsm_state <= INIT_ADD_KEY;
                     end if;
 
