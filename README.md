@@ -1,5 +1,4 @@
-# CyberPUF
-: PUF Tabanlı Uç Yapay Zeka (Edge-AI) Model Ağırlığı Şifrelemesi
+# CyberPUF: PUF Tabanlı Uç Yapay Zeka (Edge-AI) Model Ağırlığı Şifrelemesi
 
 [Türkçe](#turkce) | [English](#english)
 
