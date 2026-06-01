@@ -5,7 +5,7 @@ import time
 
 def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='GCM'):
     print("=" * 70)
-    print("CypherPUF - Faz 1: Tam Pipeline Calistirma")
+    print("CyberPUF - Faz 1: Tam Pipeline Calistirma")
     print("Gelistirici: Arda Mecik")
     print("=" * 70)
     print(f"  Epoch sayisi       : {epoch_sayisi}")
@@ -19,11 +19,11 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     def cleanup_on_error():
         print("\n  [HATA YONETIMI] Ara dosyalar temizleniyor...")
         dosyalar = [
-            os.path.join('ai_sifreleme', 'cypherpuf_weights.cpuf'),
-            os.path.join('ai_sifreleme', 'cypherpuf_encrypted_weights.bin'),
-            os.path.join('ai_sifreleme', 'cypherpuf_ciphertext_raw.bin'),
-            os.path.join('ai_sifreleme', 'cypherpuf_nonce.bin'),
-            os.path.join('ai_sifreleme', 'cypherpuf_auth_tag.bin')
+            os.path.join('ai_sifreleme', 'cyberpuf_weights.cpuf'),
+            os.path.join('ai_sifreleme', 'cyberpuf_encrypted_weights.bin'),
+            os.path.join('ai_sifreleme', 'cyberpuf_ciphertext_raw.bin'),
+            os.path.join('ai_sifreleme', 'cyberpuf_nonce.bin'),
+            os.path.join('ai_sifreleme', 'cyberpuf_auth_tag.bin')
         ]
         for dosya in dosyalar:
             if os.path.exists(dosya):

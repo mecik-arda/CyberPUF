@@ -8,7 +8,7 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 
-CYPHERPUF_STATIC_AES_KEY = bytes([
+CYBERPUF_STATIC_AES_KEY = bytes([
     0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
     0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C,
     0x6B, 0xC1, 0xBE, 0xE2, 0x2E, 0x40, 0x9F, 0x96,
@@ -199,12 +199,12 @@ def verify_encryption():
     export_dir = os.path.join(base_dir, 'exported_weights')
     encrypt_dir = os.path.join(base_dir, 'encrypted_weights')
 
-    encrypted_file = os.path.join(encrypt_dir, 'cypherpuf_encrypted_weights.bin')
-    original_weights_bin = os.path.join(export_dir, 'cypherpuf_weights.bin')
+    encrypted_file = os.path.join(encrypt_dir, 'cyberpuf_encrypted_weights.bin')
+    original_weights_bin = os.path.join(export_dir, 'cyberpuf_weights.bin')
     original_weights_npz = os.path.join(export_dir, 'numpy_weights', 'all_weights_combined.npz')
 
     print("=" * 70)
-    print("CypherPUF - Faz 1: Uctan Uca Sifreleme Dogrulama")
+    print("CyberPUF - Faz 1: Uctan Uca Sifreleme Dogrulama")
     print("Gelistirici: Arda Mecik")
     print("=" * 70)
 
@@ -242,7 +242,7 @@ def verify_encryption():
     print("-" * 70)
 
     try:
-        aes_key = derive_key_from_puf_simulation(CYPHERPUF_STATIC_AES_KEY)
+        aes_key = derive_key_from_puf_simulation(CYBERPUF_STATIC_AES_KEY)
         print(f"  AES Anahtari (hex): {aes_key.hex()}")
 
         decrypted_data = decrypt_data(
@@ -431,7 +431,7 @@ def verify_encryption():
     print("=" * 70)
 
     verification_report = {
-        'project': 'CypherPUF',
+        'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'phase': 'Faz 1 - End-to-End Verification',
         'tests': [

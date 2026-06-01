@@ -106,7 +106,7 @@ architecture rtl of axi4_lite_sarmalayici is
     signal kexp_done_sticky : std_logic;
     signal aes_done_sticky  : std_logic;
 
-    component cypherpuf_ust is
+    component cyberpuf_ust is
         generic (
             RO_CIFT_SAYISI     : integer := 16;
             INVERTER_SAYISI    : integer := 3;
@@ -140,7 +140,7 @@ begin
 
     core_data_in <= reg_data_in_3 & reg_data_in_2 & reg_data_in_1 & reg_data_in_0;
 
-    cypherpuf_core: cypherpuf_ust
+    cyberpuf_core: cyberpuf_ust
         generic map (
             RO_CIFT_SAYISI    => RO_CIFT_SAYISI,
             INVERTER_SAYISI   => INVERTER_SAYISI,

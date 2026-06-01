@@ -67,5 +67,5 @@ work-obj08.cf
 .idea/
 *.swp
 
-# CypherPUF Outputs
+# CyberPUF Outputs
 output/

@@ -1,32 +1,32 @@
-#include "cypherpuf_dsk.h"
+#include "cyberpuf_dsk.h"
 #include "platform_yapilandirmasi.h"
 #include "xil_printf.h"
 #include <string.h>
 
-static uint32_t base_addr = CYPHERPUF_TABAN_ADRES;
+static uint32_t base_addr = CYBERPUF_TABAN_ADRES;
 
-void CypherPUF_Baslat(uint32_t taban_adresi) {
+void CyberPUF_Baslat(uint32_t taban_adresi) {
     base_addr = taban_adresi;
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, KONTROL_DURUM_TEMIZLE_BITI);
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, 0x00000000);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, KONTROL_DURUM_TEMIZLE_BITI);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, 0x00000000);
 }
 
-uint32_t CypherPUF_DurumAl(void) {
-    return Xil_In32(base_addr + CYPHERPUF_REG_DURUM);
+uint32_t CyberPUF_DurumAl(void) {
+    return Xil_In32(base_addr + CYBERPUF_REG_DURUM);
 }
 
-bool CypherPUF_AnahtarUret(void) {
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, KONTROL_DURUM_TEMIZLE_BITI);
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, 0x00000000);
+bool CyberPUF_AnahtarUret(void) {
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, KONTROL_DURUM_TEMIZLE_BITI);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, 0x00000000);
 
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, KONTROL_ANAHTAR_URET_BITI);
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, 0x00000000);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, KONTROL_ANAHTAR_URET_BITI);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, 0x00000000);
 
     uint32_t durum = 0;
     uint32_t timeout = 0xFFFFFF;
 
     while (timeout > 0) {
-        durum = Xil_In32(base_addr + CYPHERPUF_REG_DURUM);
+        durum = Xil_In32(base_addr + CYBERPUF_REG_DURUM);
         if ((durum & DURUM_ANAHTAR_GEN_TAMAM_BITI) != 0) {
             return true;
         }
@@ -36,28 +36,28 @@ bool CypherPUF_AnahtarUret(void) {
     return false;
 }
 
-bool CypherPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin_16b) {
+bool CyberPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin_16b) {
     uint32_t w3 = ((uint32_t)sifreli_metin_16b[0] << 24) | ((uint32_t)sifreli_metin_16b[1] << 16) | ((uint32_t)sifreli_metin_16b[2] << 8) | sifreli_metin_16b[3];
     uint32_t w2 = ((uint32_t)sifreli_metin_16b[4] << 24) | ((uint32_t)sifreli_metin_16b[5] << 16) | ((uint32_t)sifreli_metin_16b[6] << 8) | sifreli_metin_16b[7];
     uint32_t w1 = ((uint32_t)sifreli_metin_16b[8] << 24) | ((uint32_t)sifreli_metin_16b[9] << 16) | ((uint32_t)sifreli_metin_16b[10] << 8) | sifreli_metin_16b[11];
     uint32_t w0 = ((uint32_t)sifreli_metin_16b[12] << 24) | ((uint32_t)sifreli_metin_16b[13] << 16) | ((uint32_t)sifreli_metin_16b[14] << 8) | sifreli_metin_16b[15];
 
-    Xil_Out32(base_addr + CYPHERPUF_REG_VERI_GIRIS_0, w0);
-    Xil_Out32(base_addr + CYPHERPUF_REG_VERI_GIRIS_1, w1);
-    Xil_Out32(base_addr + CYPHERPUF_REG_VERI_GIRIS_2, w2);
-    Xil_Out32(base_addr + CYPHERPUF_REG_VERI_GIRIS_3, w3);
+    Xil_Out32(base_addr + CYBERPUF_REG_VERI_GIRIS_0, w0);
+    Xil_Out32(base_addr + CYBERPUF_REG_VERI_GIRIS_1, w1);
+    Xil_Out32(base_addr + CYBERPUF_REG_VERI_GIRIS_2, w2);
+    Xil_Out32(base_addr + CYBERPUF_REG_VERI_GIRIS_3, w3);
 
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, KONTROL_DURUM_TEMIZLE_BITI);
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, 0x00000000);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, KONTROL_DURUM_TEMIZLE_BITI);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, 0x00000000);
 
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, KONTROL_SIFRE_COZ_BASLA_BITI);
-    Xil_Out32(base_addr + CYPHERPUF_REG_KONTROL, 0x00000000);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, KONTROL_SIFRE_COZ_BASLA_BITI);
+    Xil_Out32(base_addr + CYBERPUF_REG_KONTROL, 0x00000000);
 
     uint32_t durum = 0;
     uint32_t timeout = 0xFFFFFF;
 
     while (timeout > 0) {
-        durum = Xil_In32(base_addr + CYPHERPUF_REG_DURUM);
+        durum = Xil_In32(base_addr + CYBERPUF_REG_DURUM);
         if ((durum & DURUM_AES_TAMAM_BITI) != 0) {
             break;
         }
@@ -68,10 +68,10 @@ bool CypherPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin
         return false;
     }
 
-    uint32_t r0 = Xil_In32(base_addr + CYPHERPUF_REG_VERI_CIKIS_0);
-    uint32_t r1 = Xil_In32(base_addr + CYPHERPUF_REG_VERI_CIKIS_1);
-    uint32_t r2 = Xil_In32(base_addr + CYPHERPUF_REG_VERI_CIKIS_2);
-    uint32_t r3 = Xil_In32(base_addr + CYPHERPUF_REG_VERI_CIKIS_3);
+    uint32_t r0 = Xil_In32(base_addr + CYBERPUF_REG_VERI_CIKIS_0);
+    uint32_t r1 = Xil_In32(base_addr + CYBERPUF_REG_VERI_CIKIS_1);
+    uint32_t r2 = Xil_In32(base_addr + CYBERPUF_REG_VERI_CIKIS_2);
+    uint32_t r3 = Xil_In32(base_addr + CYBERPUF_REG_VERI_CIKIS_3);
 
     duz_metin_16b[0] = (uint8_t)((r3 >> 24) & 0xFF);
     duz_metin_16b[1] = (uint8_t)((r3 >> 16) & 0xFF);
@@ -96,10 +96,10 @@ bool CypherPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin
     return true;
 }
 
-void CypherPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, uint32_t boyut_bayt) {
+void CyberPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, uint32_t boyut_bayt) {
     uint32_t blocks = boyut_bayt / 16;
     for (uint32_t i = 0; i < blocks; i++) {
-        CypherPUF_BlokSifreCoz(&sifreli_metin[i * 16], &duz_metin[i * 16]);
+        CyberPUF_BlokSifreCoz(&sifreli_metin[i * 16], &duz_metin[i * 16]);
     }
     
     uint32_t remainder = boyut_bayt % 16;
@@ -108,14 +108,14 @@ void CypherPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, 
         uint8_t temp_sifreli[16] = {0};
         uint8_t temp_duz[16] = {0};
         memcpy(temp_sifreli, &sifreli_metin[blocks * 16], remainder);
-        CypherPUF_BlokSifreCoz(temp_sifreli, temp_duz);
+        CyberPUF_BlokSifreCoz(temp_sifreli, temp_duz);
         memcpy(&duz_metin[blocks * 16], temp_duz, remainder);
     }
 }
 
-void CypherPUF_PUFAnahtariAl(uint8_t* anahtar_tamponu_32b) {
+void CyberPUF_PUFAnahtariAl(uint8_t* anahtar_tamponu_32b) {
     for (int i = 0; i < 8; i++) {
-        uint32_t word = Xil_In32(base_addr + CYPHERPUF_REG_PUF_ANAHTAR_0 + (i * 4));
+        uint32_t word = Xil_In32(base_addr + CYBERPUF_REG_PUF_ANAHTAR_0 + (i * 4));
         anahtar_tamponu_32b[i * 4 + 0] = (uint8_t)(word & 0xFF);
         anahtar_tamponu_32b[i * 4 + 1] = (uint8_t)((word >> 8) & 0xFF);
         anahtar_tamponu_32b[i * 4 + 2] = (uint8_t)((word >> 16) & 0xFF);

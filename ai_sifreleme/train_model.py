@@ -7,7 +7,7 @@ from tensorflow import keras
 from tensorflow.keras import layers, regularizers, callbacks
 
 
-def build_cypherpuf_cnn(input_shape=(32, 32, 3), num_classes=10):
+def build_cyberpuf_cnn(input_shape=(32, 32, 3), num_classes=10):
     model = keras.Sequential()
 
     model.add(layers.Input(shape=input_shape))
@@ -170,7 +170,7 @@ def train_model(epochs=100, batch_size=128, learning_rate=0.001):
     os.makedirs(cikis_dizini, exist_ok=True)
 
     print("=" * 70)
-    print("CypherPUF - Faz 1: CIFAR-10 CNN Model Egitimi")
+    print("CyberPUF - Faz 1: CIFAR-10 CNN Model Egitimi")
     print("Gelistirici: Arda Mecik")
     print("=" * 70)
 
@@ -187,7 +187,7 @@ def train_model(epochs=100, batch_size=128, learning_rate=0.001):
     print(f"  Normalizasyon parametreleri kaydedildi: {norm_param_yolu}")
 
     print("\n[2/6] CNN modeli olusturuluyor...")
-    model = build_cypherpuf_cnn(input_shape=(32, 32, 3), num_classes=10)
+    model = build_cyberpuf_cnn(input_shape=(32, 32, 3), num_classes=10)
     model.summary()
 
     print("\n[3/6] Model derleniyor...")
@@ -230,16 +230,16 @@ def train_model(epochs=100, batch_size=128, learning_rate=0.001):
     print(f"  Test kaybi (loss)   : {test_kaybi:.4f}")
     print(f"  Test dogrulugu (acc): {test_dogrulugu:.4f}")
 
-    tam_model_yolu = os.path.join(cikis_dizini, 'cypherpuf_cifar10_model.h5')
+    tam_model_yolu = os.path.join(cikis_dizini, 'cyberpuf_cifar10_model.h5')
     model.save(tam_model_yolu)
     print(f"  Tam model kaydedildi: {tam_model_yolu}")
 
-    sadece_agirlik_yolu = os.path.join(cikis_dizini, 'cypherpuf_cifar10_weights.weights.h5')
+    sadece_agirlik_yolu = os.path.join(cikis_dizini, 'cyberpuf_cifar10_weights.weights.h5')
     model.save_weights(sadece_agirlik_yolu)
     print(f"  Agirliklar kaydedildi: {sadece_agirlik_yolu}")
 
     egitim_ozeti = {
-        'proje': 'CypherPUF',
+        'proje': 'CyberPUF',
         'gelistirici': 'Arda Mecik',
         'faz': 'Faz 1 - AI Model Egitimi',
         'veri_seti': 'CIFAR-10',

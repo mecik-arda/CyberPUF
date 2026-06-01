@@ -188,7 +188,7 @@ static float* DenseParametreleriniCikar(float* ptr, DenseLayerParams* p, int in_
     return ptr;
 }
 
-void CypherPUF_CNN_Calistir(const float* giris_goruntusu, float* ham_agirliklar, float* cikis_olasiliklari) {
+void CyberPUF_CNN_Calistir(const float* giris_goruntusu, float* ham_agirliklar, float* cikis_olasiliklari) {
     float* w_ptr = ham_agirliklar;
     ConvLayerParams conv1_1, conv1_2, conv2_1, conv2_2, conv3_1, conv3_2;
     DenseLayerParams dense1, dense2;

@@ -10,7 +10,7 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
 
-CYPHERPUF_STATIC_AES_KEY = bytes([
+CYBERPUF_STATIC_AES_KEY = bytes([
     0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
     0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C,
     0x6B, 0xC1, 0xBE, 0xE2, 0x2E, 0x40, 0x9F, 0x96,
@@ -92,8 +92,8 @@ def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
 def generate_c_header(encrypted_data, output_path, array_name='encrypted_weights'):
     lines = []
 
-    lines.append(f'#ifndef CYPHERPUF_ENCRYPTED_WEIGHTS_H')
-    lines.append(f'#define CYPHERPUF_ENCRYPTED_WEIGHTS_H')
+    lines.append(f'#ifndef CYBERPUF_ENCRYPTED_WEIGHTS_H')
+    lines.append(f'#define CYBERPUF_ENCRYPTED_WEIGHTS_H')
     lines.append(f'')
     lines.append(f'#include <stdint.h>')
     lines.append(f'')
@@ -136,7 +136,7 @@ def generate_c_header_chunked(encrypted_data, output_dir, array_name='encrypted_
         chunk_path = os.path.join(output_dir, chunk_filename)
 
         lines = []
-        guard = f'CYPHERPUF_{array_name.upper()}_CHUNK_{chunk_idx:04d}_H'
+        guard = f'CYBERPUF_{array_name.upper()}_CHUNK_{chunk_idx:04d}_H'
         lines.append(f'#ifndef {guard}')
         lines.append(f'#define {guard}')
         lines.append(f'')
@@ -168,7 +168,7 @@ def generate_c_header_chunked(encrypted_data, output_dir, array_name='encrypted_
 
     master_header_path = os.path.join(output_dir, f'{array_name}_master.h')
     master_lines = []
-    master_guard = f'CYPHERPUF_{array_name.upper()}_MASTER_H'
+    master_guard = f'CYBERPUF_{array_name.upper()}_MASTER_H'
     master_lines.append(f'#ifndef {master_guard}')
     master_lines.append(f'#define {master_guard}')
     master_lines.append(f'')
@@ -225,7 +225,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     os.makedirs(c_header_dir, exist_ok=True)
 
     if weight_binary_path is None:
-        weight_binary_path = os.path.join(export_dir, 'cypherpuf_weights.bin')
+        weight_binary_path = os.path.join(export_dir, 'cyberpuf_weights.bin')
 
     if not os.path.exists(weight_binary_path):
         print(f"HATA: Agirlik dosyasi bulunamadi: {weight_binary_path}")
@@ -233,7 +233,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
         sys.exit(1)
 
     print("=" * 70)
-    print("CypherPUF - Faz 1: AES-256 Agirlik Sifreleme")
+    print("CyberPUF - Faz 1: AES-256 Agirlik Sifreleme")
     print("Gelistirici: Arda Mecik")
     print(f"Sifreleme Modu: AES-256-{encryption_mode}")
     print("=" * 70)
@@ -247,7 +247,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     print(f"  SHA-256 ozeti : {plaintext_sha256}")
 
     print("\n[2/7] PUF simule edilen AES-256 anahtari hazirlaniyor...")
-    aes_key = derive_key_from_puf_simulation(CYPHERPUF_STATIC_AES_KEY)
+    aes_key = derive_key_from_puf_simulation(CYBERPUF_STATIC_AES_KEY)
     print(f"  Anahtar uzunlugu : {len(aes_key) * 8} bit")
     print(f"  Anahtar (hex)    : {aes_key.hex()}")
     print(f"  Not: Bu statik anahtar, Faz 2'de FPGA uzerindeki RO-PUF tarafindan")
@@ -255,10 +255,10 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
 
     key_info_path = os.path.join(encrypt_dir, 'puf_simulated_key.json')
     key_info = {
-        'project': 'CypherPUF',
+        'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'description': 'PUF simulated AES-256 key (to be replaced by hardware PUF in Phase 2)',
-        'raw_key_hex': CYPHERPUF_STATIC_AES_KEY.hex(),
+        'raw_key_hex': CYBERPUF_STATIC_AES_KEY.hex(),
         'derived_key_hex': aes_key.hex(),
         'key_length_bits': len(aes_key) * 8,
         'derivation_method': 'SHA-256',
@@ -307,7 +307,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     print("\n[5/7] Sifreli ikili (binary) dosya olusturuluyor...")
 
     encryption_metadata = {
-        'project': 'CypherPUF',
+        'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'encryption_mode': f'AES-256-{encryption_mode}',
         'plaintext_size': len(plaintext_data),
@@ -322,31 +322,31 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
         ciphertext, nonce, auth_tag, encryption_metadata, mode=encryption_mode
     )
 
-    encrypted_bin_path = os.path.join(encrypt_dir, 'cypherpuf_encrypted_weights.bin')
+    encrypted_bin_path = os.path.join(encrypt_dir, 'cyberpuf_encrypted_weights.bin')
     with open(encrypted_bin_path, 'wb') as f:
         f.write(encrypted_binary)
     print(f"  Sifreli dosya boyutu : {len(encrypted_binary):,} byte ({len(encrypted_binary) / (1024 * 1024):.2f} MB)")
     print(f"  Dosya kaydedildi     : {encrypted_bin_path}")
 
-    raw_encrypted_path = os.path.join(encrypt_dir, 'cypherpuf_ciphertext_raw.bin')
+    raw_encrypted_path = os.path.join(encrypt_dir, 'cyberpuf_ciphertext_raw.bin')
     with open(raw_encrypted_path, 'wb') as f:
         f.write(ciphertext)
     print(f"  Ham sifreli veri     : {raw_encrypted_path}")
 
-    nonce_path = os.path.join(encrypt_dir, 'cypherpuf_nonce.bin')
+    nonce_path = os.path.join(encrypt_dir, 'cyberpuf_nonce.bin')
     with open(nonce_path, 'wb') as f:
         f.write(nonce)
     print(f"  Nonce/IV dosyasi     : {nonce_path}")
 
     if encryption_mode == 'GCM':
-        tag_path = os.path.join(encrypt_dir, 'cypherpuf_auth_tag.bin')
+        tag_path = os.path.join(encrypt_dir, 'cyberpuf_auth_tag.bin')
         with open(tag_path, 'wb') as f:
             f.write(auth_tag)
         print(f"  Auth Tag dosyasi     : {tag_path}")
 
     print("\n[6/7] C header dosyalari olusturuluyor (donanima yukleme icin)...")
 
-    single_header_path = os.path.join(c_header_dir, 'cypherpuf_encrypted_weights.h')
+    single_header_path = os.path.join(c_header_dir, 'cyberpuf_encrypted_weights.h')
     if len(encrypted_binary) <= 1024 * 1024:
         generate_c_header(encrypted_binary, single_header_path)
         print(f"  Tekil header dosyasi : {single_header_path}")
@@ -363,10 +363,10 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     for cf in chunk_files:
         print(f"    -> {cf}")
 
-    nonce_header_path = os.path.join(c_header_dir, 'cypherpuf_nonce.h')
+    nonce_header_path = os.path.join(c_header_dir, 'cyberpuf_nonce.h')
     nonce_header_lines = []
-    nonce_header_lines.append('#ifndef CYPHERPUF_NONCE_H')
-    nonce_header_lines.append('#define CYPHERPUF_NONCE_H')
+    nonce_header_lines.append('#ifndef CYBERPUF_NONCE_H')
+    nonce_header_lines.append('#define CYBERPUF_NONCE_H')
     nonce_header_lines.append('')
     nonce_header_lines.append('#include <stdint.h>')
     nonce_header_lines.append('')
@@ -393,7 +393,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     print("\n[7/7] Sifreleme ozet raporu olusturuluyor...")
 
     encryption_report = {
-        'project': 'CypherPUF',
+        'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'phase': 'Faz 1 - AES-256 Encryption',
         'encryption': {

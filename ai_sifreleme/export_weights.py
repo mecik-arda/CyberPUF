@@ -194,7 +194,7 @@ def export_weights(model_path=None):
     os.makedirs(export_dir, exist_ok=True)
 
     if model_path is None:
-        model_path = os.path.join(model_dir, 'cypherpuf_cifar10_model.h5')
+        model_path = os.path.join(model_dir, 'cyberpuf_cifar10_model.h5')
 
     if not os.path.exists(model_path):
         print(f"HATA: Model dosyasi bulunamadi: {model_path}")
@@ -202,7 +202,7 @@ def export_weights(model_path=None):
         sys.exit(1)
 
     print("=" * 70)
-    print("CypherPUF - Faz 1: Agirlik Disa Aktarma (Weight Export)")
+    print("CyberPUF - Faz 1: Agirlik Disa Aktarma (Weight Export)")
     print("Gelistirici: Arda Mecik")
     print("=" * 70)
 
@@ -225,7 +225,7 @@ def export_weights(model_path=None):
     print(f"  Ikili veri boyutu    : {len(binary_data):,} byte ({len(binary_data) / (1024 * 1024):.2f} MB)")
     print(f"  SHA-256 ozeti        : {sha256_hash}")
 
-    binary_path = os.path.join(export_dir, 'cypherpuf_weights.bin')
+    binary_path = os.path.join(export_dir, 'cyberpuf_weights.bin')
     with open(binary_path, 'wb') as f:
         f.write(binary_data)
     print(f"  Ikili dosya kaydedildi: {binary_path}")
@@ -268,13 +268,13 @@ def export_weights(model_path=None):
         manifest_serializable.append(s_entry)
 
     manifest_data = {
-        'project': 'CypherPUF',
+        'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'phase': 'Faz 1 - Weight Export',
         'total_arrays': len(weight_arrays),
         'total_parameters': int(total_params),
         'total_size_bytes': int(total_params * 4),
-        'binary_file': 'cypherpuf_weights.bin',
+        'binary_file': 'cyberpuf_weights.bin',
         'binary_sha256': sha256_hash,
         'manifest': manifest_serializable
     }

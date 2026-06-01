@@ -3,7 +3,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use work.aes_paket.ALL;
 
-entity cypherpuf_ust is
+entity cyberpuf_ust is
     generic (
         RO_CIFT_SAYISI     : integer := 16;
         INVERTER_SAYISI    : integer := 3;
@@ -33,9 +33,9 @@ entity cypherpuf_ust is
         hata_ayiklama_sayac_a       : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0);
         hata_ayiklama_sayac_b       : out std_logic_vector(SAYICI_GENISLIGI - 1 downto 0)
     );
-end entity cypherpuf_ust;
+end entity cyberpuf_ust;
 
-architecture rtl of cypherpuf_ust is
+architecture rtl of cyberpuf_ust is
 
     type sistem_durumu_t is (
         SYS_BOSTA,

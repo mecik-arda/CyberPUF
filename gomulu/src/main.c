@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "platform_yapilandirmasi.h"
-#include "cypherpuf_dsk.h"
+#include "cyberpuf_dsk.h"
 #include "yapay_zeka_cikarimi.h"
 #include "test_goruntusu.h"
 #include "yardimci_veri_uretici.h"
@@ -14,46 +14,46 @@ extern const uint32_t SIFRELI_VERI_BOYUTU;
 #if XILINX_BAREMETAL_SIM
 static uint8_t sim_reg_alani[128];
 void Sim_RegYaz(uint32_t adres, uint32_t data) {
-    uint32_t ofset = adres - CYPHERPUF_TABAN_ADRES;
+    uint32_t ofset = adres - CYBERPUF_TABAN_ADRES;
     if (ofset < 128) {
         sim_reg_alani[ofset] = data & 0xFF;
         sim_reg_alani[ofset+1] = (data >> 8) & 0xFF;
         sim_reg_alani[ofset+2] = (data >> 16) & 0xFF;
         sim_reg_alani[ofset+3] = (data >> 24) & 0xFF;
         
-        if (ofset == CYPHERPUF_REG_KONTROL) {
+        if (ofset == CYBERPUF_REG_KONTROL) {
             if (data & KONTROL_ANAHTAR_URET_BITI) {
-                uint32_t durum = sim_reg_alani[CYPHERPUF_REG_DURUM] | sim_reg_alani[CYPHERPUF_REG_DURUM+1]<<8 | sim_reg_alani[CYPHERPUF_REG_DURUM+2]<<16 | sim_reg_alani[CYPHERPUF_REG_DURUM+3]<<24;
+                uint32_t durum = sim_reg_alani[CYBERPUF_REG_DURUM] | sim_reg_alani[CYBERPUF_REG_DURUM+1]<<8 | sim_reg_alani[CYBERPUF_REG_DURUM+2]<<16 | sim_reg_alani[CYBERPUF_REG_DURUM+3]<<24;
                 durum |= DURUM_PUF_TAMAM_BITI | DURUM_ANAHTAR_GEN_TAMAM_BITI;
-                sim_reg_alani[CYPHERPUF_REG_DURUM] = durum & 0xFF;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+1] = (durum >> 8) & 0xFF;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+2] = (durum >> 16) & 0xFF;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+3] = (durum >> 24) & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM] = durum & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM+1] = (durum >> 8) & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM+2] = (durum >> 16) & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM+3] = (durum >> 24) & 0xFF;
             }
             if (data & KONTROL_SIFRE_COZ_BASLA_BITI) {
-                uint32_t durum = sim_reg_alani[CYPHERPUF_REG_DURUM] | sim_reg_alani[CYPHERPUF_REG_DURUM+1]<<8 | sim_reg_alani[CYPHERPUF_REG_DURUM+2]<<16 | sim_reg_alani[CYPHERPUF_REG_DURUM+3]<<24;
+                uint32_t durum = sim_reg_alani[CYBERPUF_REG_DURUM] | sim_reg_alani[CYBERPUF_REG_DURUM+1]<<8 | sim_reg_alani[CYBERPUF_REG_DURUM+2]<<16 | sim_reg_alani[CYBERPUF_REG_DURUM+3]<<24;
                 durum |= DURUM_AES_TAMAM_BITI;
-                sim_reg_alani[CYPHERPUF_REG_DURUM] = durum & 0xFF;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+1] = (durum >> 8) & 0xFF;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+2] = (durum >> 16) & 0xFF;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+3] = (durum >> 24) & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM] = durum & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM+1] = (durum >> 8) & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM+2] = (durum >> 16) & 0xFF;
+                sim_reg_alani[CYBERPUF_REG_DURUM+3] = (durum >> 24) & 0xFF;
                 
                 for(int i=0; i<16; i++) {
-                    sim_reg_alani[CYPHERPUF_REG_VERI_CIKIS_0 + i] = sim_reg_alani[CYPHERPUF_REG_VERI_GIRIS_0 + i];
+                    sim_reg_alani[CYBERPUF_REG_VERI_CIKIS_0 + i] = sim_reg_alani[CYBERPUF_REG_VERI_GIRIS_0 + i];
                 }
             }
             if (data & KONTROL_DURUM_TEMIZLE_BITI) {
-                sim_reg_alani[CYPHERPUF_REG_DURUM] = 0;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+1] = 0;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+2] = 0;
-                sim_reg_alani[CYPHERPUF_REG_DURUM+3] = 0;
+                sim_reg_alani[CYBERPUF_REG_DURUM] = 0;
+                sim_reg_alani[CYBERPUF_REG_DURUM+1] = 0;
+                sim_reg_alani[CYBERPUF_REG_DURUM+2] = 0;
+                sim_reg_alani[CYBERPUF_REG_DURUM+3] = 0;
             }
         }
     }
 }
 
 uint32_t Sim_RegOku(uint32_t adres) {
-    uint32_t ofset = adres - CYPHERPUF_TABAN_ADRES;
+    uint32_t ofset = adres - CYBERPUF_TABAN_ADRES;
     if (ofset < 128) {
         return (sim_reg_alani[ofset]) | (sim_reg_alani[ofset+1] << 8) | (sim_reg_alani[ofset+2] << 16) | (sim_reg_alani[ofset+3] << 24);
     }
@@ -102,14 +102,14 @@ uint32_t CPFE_Header_Oku(const uint8_t* tampon, uint8_t* nonce, uint32_t* metada
 
 int main(void) {
     xil_printf("========================================\n");
-    xil_printf("CypherPUF - Faz 3: Gomulu Yapay Zeka Cikarimi\n");
+    xil_printf("CyberPUF - Faz 3: Gomulu Yapay Zeka Cikarimi\n");
     xil_printf("Gelistirici: Arda Mecik\n");
     xil_printf("========================================\n");
     
-    CypherPUF_Baslat(CYPHERPUF_TABAN_ADRES);
+    CyberPUF_Baslat(CYBERPUF_TABAN_ADRES);
     
     xil_printf("[1/4] Donanim PUF Anahtar Uretimi Tetikleniyor...\n");
-    bool anahtar_uretimi_tamam = CypherPUF_AnahtarUret();
+    bool anahtar_uretimi_tamam = CyberPUF_AnahtarUret();
     if (!anahtar_uretimi_tamam) {
         xil_printf("HATA: PUF anahtar uretimi basarisiz oldu veya zaman asimina ugradi.\n");
         return -1;
@@ -117,7 +117,7 @@ int main(void) {
     xil_printf("      -> PUF Anahtari uretildi ve AES Tur Anahtarlarina basariyla genisletildi.\n");
     
     uint8_t puf_anahtari[32];
-    CypherPUF_PUFAnahtariAl(puf_anahtari);
+    CyberPUF_PUFAnahtariAl(puf_anahtari);
     xil_printf("      -> PUF Anahtari (Hex): ");
     for(int i=0; i<32; i++) xil_printf("%02X", puf_anahtari[i]);
     xil_printf("\n");
@@ -176,7 +176,7 @@ int main(void) {
         return -1;
     }
     
-    CypherPUF_TamponSifreCoz(
+    CyberPUF_TamponSifreCoz(
         &sifreli_agirliklar[ciphertext_offset],
         &cozulmus_bellek[ciphertext_offset],
         SIFRELI_VERI_BOYUTU - ciphertext_offset
@@ -203,7 +203,7 @@ int main(void) {
         xil_printf("      -> Sahte agirliklar nedeniyle bellek erisim hatasini onlemek icin simulasyonda tam cikarim atlandi.\n");
         cikis_olasiliklari[0] = 0.95f;
     #else
-        CypherPUF_CNN_Calistir(test_goruntusu_cifar10, ham_agirliklar, cikis_olasiliklari);
+        CyberPUF_CNN_Calistir(test_goruntusu_cifar10, ham_agirliklar, cikis_olasiliklari);
     #endif
     
     xil_printf("\nCikarim Sonuclari (Softmax Olasiliklari):\n");

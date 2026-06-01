@@ -3,10 +3,10 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use work.aes_paket.ALL;
 
-entity tb_cypherpuf_ust is
-end entity tb_cypherpuf_ust;
+entity tb_cyberpuf_ust is
+end entity tb_cyberpuf_ust;
 
-architecture sim of tb_cypherpuf_ust is
+architecture sim of tb_cyberpuf_ust is
 
     constant CLK_PERIOD : time := 10 ns;
 
@@ -27,7 +27,7 @@ architecture sim of tb_cypherpuf_ust is
     signal hata_ayiklama_sayac_a       : std_logic_vector(19 downto 0);
     signal hata_ayiklama_sayac_b       : std_logic_vector(19 downto 0);
 
-    component cypherpuf_ust is
+    component cyberpuf_ust is
         generic (
             RO_CIFT_SAYISI     : integer := 16;
             INVERTER_SAYISI    : integer := 3;
@@ -59,7 +59,7 @@ begin
 
     clk <= not clk after CLK_PERIOD / 2;
 
-    uut: cypherpuf_ust
+    uut: cyberpuf_ust
         generic map (
             RO_CIFT_SAYISI    => 16,
             INVERTER_SAYISI   => 3,
@@ -89,7 +89,7 @@ begin
     process
     begin
         report "========================================";
-        report "CypherPUF Top-Level Entegrasyon Testi";
+        report "CyberPUF Top-Level Entegrasyon Testi";
         report "========================================";
 
         rst <= '1';
