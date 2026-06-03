@@ -8,9 +8,8 @@
 ## Türkçe
 
 **Geliştirici:** Arda Meçik (AltaySec bünyesinde geliştirilmiştir)
-**Sürüm:** v2.1.0-RC3 (20+ Hata Düzeltme Devri)  
+**Sürüm:** v3.0.0-Final (Tüm Fazlar Tamamlandı)
 **Lisans:** MIT
-
 
 CyberPUF, uç cihazlarda (FPGA ve SoC mimarileri gibi) konuşlandırılan yapay sinir ağı ağırlıklarının fikri mülkiyetini (IP) korumak için tasarlanmış gelişmiş bir Donanım Güvenliği ve Gömülü Yapay Zeka projesidir. Model ağırlıklarının harici flash/RAM'de şifrelenmiş olarak saklanmasını ve yalnızca çalışma zamanında, silikon sınırları içinde Ring Oscillator Fiziksel Klonlanamaz Fonksiyonu (RO-PUF) tarafından üretilen donanıma özgü bir anahtar kullanılarak deşifre edilmesini sağlar.
 
@@ -21,7 +20,7 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 #### Faz 1: Yapay Zeka Eğitimi ve Şifreleme (Python)
 - **Model Eğitimi:** CIFAR-10 veri seti üzerinde TensorFlow/Keras kullanılarak Evrişimli Sinir Ağı (CNN) eğitilir.
 - **CPUF Format Dönüşümü:** Ağırlıklar ve bias'lar `.h5` dosyasından çıkarılır ve dinamik meta veriler ile ham `float32` tensörlerini içeren özel bir ikili formata (`.cpuf`) dönüştürülür.
-- **AES-256 Şifreleme:** `pycryptodome` kütüphanesi kullanılarak `.cpuf` dosyası AES-256 (GCM/CBC) ile şifrelenir. C header formatında ve `.cpfe` ikili formatında dışa aktarılır.
+- **AES-256-CBC & SHA-256 Şifreleme:** `pycryptodome` kütüphanesi kullanılarak `.cpuf` dosyası PKCS7 dolgusu ile AES-256-CBC modunda şifrelenir. Güvenlik bütünlüğü (Tamper Detection) için ağırlıkların donanım öncesi `SHA-256` özeti hesaplanarak başlığa (header) dinamik olarak eklenir. `CYBERPUF_AES_KEY` ortam değişkeni fail-fast güvenlik kalkanıyla korunur.
 - **Doğrulama:** Şifreleme sürecinin bütünlüğünü ve kurcalama korumasını test eden uçtan uca Python doğrulama betiği.
 
 #### Faz 2: Donanım Güvenliği ve Kriptografi (VHDL)
@@ -32,10 +31,10 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 - **AXI4-Lite Wrapper:** İşlemci Sistemi (ARM Cortex-A) ile haberleşmeyi sağlamak için tüm kriptografi çekirdeğinin 20 farklı bellek eşlemeli (memory-mapped) yazmaç ile (0x00 - 0x4C) AXI4-Lite arayüzüne sarılması.
 
 #### Faz 3: Gömülü Yapay Zeka Çıkarımı (C/C++ Bare-Metal)
-- **Donanım Soyutlama Katmanı (HAL):** Memory-mapped I/O üzerinden VHDL modüllerini kontrol eden, PUF üretimini tetikleyen ve AES motoruna 16-byte'lık şifreli bloklar besleyen özel C sürücüleri (`cyberpuf_dsk.c`).
-- **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile %100 oranında onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`).
-- **Dinamik İkili Ayrıştırıcı (Parser):** Çözülen `float32` ağırlık dizilerini bellekte eşlemek için özel CPUF başlıklarını dinamik olarak tarayan ayrıştırıcı.
-- **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D, MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
+- **Donanım Soyutlama Katmanı (HAL):** Memory-mapped I/O üzerinden VHDL modüllerini kontrol eden, PUF üretimini tetikleyen ve AES motoruna 16-byte'lık şifreli bloklar besleyen özel C sürücüleri (`cyberpuf_dsk.c`). Yazılım tarafında AES-CBC XOR zincirlemesini yönetir.
+- **SHA-256 Bütünlük Testi:** Bare-metal uyumlu C tabanlı `sha256.c` entegrasyonu. Çözülen modelin özeti hesaplanıp header'daki orijinal özet ile eşleştirilmezse donanım Panic Mode'a geçerek belleği güvenle imha eder (Secure Wipe).
+- **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile %100 oranında onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`). Global Timer üzerinden (XTime_GetTime) tam rastgele tohumlanır.
+- **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D (Cache-friendly Loop), MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
 
 ### Test Sonuçları (Donanım AES-256 Crypto Core)
 GHDL simülasyonu ile donanımın şifre çözme performansı ve doğruluğu başarıyla test edilmiştir. Aşağıda VHDL Testbench'inin doğrudan çıktısı bulunmaktadır:
@@ -99,9 +98,11 @@ cd CyberPUF
 ```
 
 **2. Faz 1'i Çalıştırma (Yapay Zeka ve Şifreleme)**
-```bash
+Windows PowerShell için:
+```powershell
 pip install -r requirements.txt
-python run_phase1.py
+$env:CYBERPUF_AES_KEY="0123456789abcdef0123456789abcdef"
+python run_phase1.py 1 128 0.001 CBC
 ```
 
 **3. Faz 2'yi Derleme (VHDL Donanımı)**
@@ -113,7 +114,7 @@ cd donanim
 **4. Faz 3'ü Çalıştırma (Gömülü C Simülasyonu)**
 ```bash
 cd gomulu
-gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c -lm -o cyberpuf_sim.exe
+gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c src/sha256.c -lm -o cyberpuf_sim.exe
 ./cyberpuf_sim.exe
 ```
 
@@ -123,7 +124,7 @@ gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_ur
 ## English
 
 **Developer:** Arda Mecik (Developed at AltaySec)
-**Version:** v2.1.0-RC3 (After 20+ Debugging Rounds)  
+**Version:** v3.0.0-Final (All Phases Completed)
 **License:** MIT
 
 CyberPUF is an advanced Hardware Security and Embedded AI project designed to protect the intellectual property (IP) of neural network weights deployed on edge devices (like FPGAs and SoC architectures). It ensures that the model weights are encrypted while stored in external flash/RAM and are only decrypted at runtime within the silicon boundaries, using an intrinsic hardware key generated by a Ring Oscillator Physical Unclonable Function (RO-PUF).
@@ -135,7 +136,7 @@ The project is structured into three continuous phases that bridge Software AI, 
 #### Phase 1: Software AI Training & Encryption (Python)
 - **Model Training:** A Convolutional Neural Network (CNN) is trained on the CIFAR-10 dataset using TensorFlow/Keras. The architecture features Conv2D blocks with Batch Normalization and ReLU.
 - **CPUF Format Serialization:** Weights and biases are extracted from the `.h5` file and serialized into a custom binary format (`.cpuf`), which includes dynamic metadata, magic numbers, and raw `float32` tensors.
-- **AES-256 Encryption:** The `pycryptodome` library encrypts the `.cpuf` binary using AES-256 in GCM/CBC mode. The ciphertext is exported both as a `.cpfe` binary and a C-header file for embedded integration.
+- **AES-256-CBC & SHA-256 Encryption:** The `pycryptodome` library encrypts the `.cpuf` binary using AES-256 in CBC mode with PKCS7 Padding. To ensure tamper-resistance, a SHA-256 digest of the plaintext weights is dynamically appended to the header. Built-in `CYBERPUF_AES_KEY` environment variable enforcement blocks unauthorized execution.
 - **Verification:** An end-to-end Python test suite ensures the integrity, decryption accuracy, and tamper-resistance of the encryption pipeline.
 
 #### Phase 2: Hardware Security & Cryptography (VHDL)
@@ -145,10 +146,10 @@ The project is structured into three continuous phases that bridge Software AI, 
 - **AXI4-Lite Wrapper:** The entire crypto-core is wrapped in an AXI4-Lite slave interface with 20 distinct memory-mapped registers (0x00 to 0x4C) for seamless communication with the Processing System (ARM Cortex-A).
 
 #### Phase 3: Embedded AI Inference (C/C++ Bare-Metal)
-- **Hardware Abstraction Layer (HAL):** Custom C drivers (`cyberpuf_dsk.c`) to control the VHDL IP via memory-mapped I/O, trigger PUF generation, and feed encrypted 16-byte blocks to the AES engine.
-- **Fuzzy Extractor (Helper Data Generator):** A smart error correction module (`yardimci_veri_uretici.c`) that perfectly corrects temperature/voltage-induced bit errors (noise) in the PUF key using Code-Offset and Hamming(7,4) Error Correction Codes (ECC).
-- **Dynamic Binary Parser:** An embedded parser that scans the custom CPUF headers dynamically in memory to map the decrypted `float32` weight arrays.
-- **Bare-Metal CNN Engine:** A C-based AI inference engine written entirely from scratch without external libraries. It supports Conv2D, MaxPool, Dense, and Fused BatchNorm+ReLU layers, utilizing a ping-pong buffer technique to minimize RAM fragmentation.
+- **Hardware Abstraction Layer (HAL):** Custom C drivers (`cyberpuf_dsk.c`) to control the VHDL IP via memory-mapped I/O, trigger PUF generation, and feed encrypted 16-byte blocks to the AES engine. Implements AES-CBC XOR chaining completely in software.
+- **SHA-256 Integrity Verification:** Integrated a lightweight bare-metal `sha256.c` library. If the decrypted payload's digest does not match the header's expected digest, the system enters Panic Mode and securely wipes the memory.
+- **Fuzzy Extractor (Helper Data Generator):** A smart error correction module (`yardimci_veri_uretici.c`) that perfectly corrects temperature/voltage-induced bit errors (noise) in the PUF key using Code-Offset and Hamming(7,4) Error Correction Codes (ECC). Fully randomized using Global Timer bounds (`XTime_GetTime`).
+- **Bare-Metal CNN Engine:** A C-based AI inference engine written entirely from scratch without external libraries. It supports Conv2D (Cache-friendly), MaxPool, Dense, and Fused BatchNorm+ReLU layers, utilizing a ping-pong buffer technique to minimize RAM fragmentation.
 
 ### Test Results (Hardware AES-256 Crypto Core)
 The decryption accuracy and performance of the hardware have been successfully tested via GHDL simulation. Below is the direct output from the VHDL Testbench:
@@ -218,6 +219,7 @@ CyberPUF/
 │   └── constraints/               # Xilinx XDC constraints files
 ├── gomulu/                        # Bare-Metal C Application
 │   ├── src/                       # HAL, AI Inference, and main program
+│   │   └── sha256.c               # Cryptographic SHA-256 implementation
 ├── run_phase1.py                  # Python Automation Orchestrator
 ├── requirements.txt               # Python Dependencies
 ├── .gitignore                     # Git ignore rules
@@ -232,9 +234,11 @@ cd CyberPUF
 ```
 
 **2. Running Phase 1 (AI Training & Encryption)**
-```bash
+For Windows PowerShell:
+```powershell
 pip install -r requirements.txt
-python run_phase1.py
+$env:CYBERPUF_AES_KEY="0123456789abcdef0123456789abcdef"
+python run_phase1.py 1 128 0.001 CBC
 ```
 
 **3. Compiling Phase 2 (VHDL Hardware)**
@@ -246,6 +250,6 @@ cd donanim
 **4. Running Phase 3 (Embedded C Simulation)**
 ```bash
 cd gomulu
-gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c -lm -o cyberpuf_sim.exe
+gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c src/sha256.c -lm -o cyberpuf_sim.exe
 ./cyberpuf_sim.exe
 ```

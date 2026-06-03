@@ -13,7 +13,7 @@ entity ro_puf_cekirdek is
         clk             : in  std_logic;
         rst             : in  std_logic;
         start           : in  std_logic;
-        challenge       : in  std_logic_vector(3 downto 0);
+        challenge       : in  std_logic_vector(7 downto 0);
         response_bit    : out std_logic;
         response_valid  : out std_logic;
         busy            : out std_logic;
@@ -36,10 +36,10 @@ architecture rtl of ro_puf_cekirdek is
     signal selected_ro_a : integer range 0 to TOTAL_RO - 1;
     signal selected_ro_b : integer range 0 to TOTAL_RO - 1;
 
-    signal ro_a_sync : std_logic_vector(2 downto 0);
-    signal ro_b_sync : std_logic_vector(2 downto 0);
-    signal ro_a_edge : std_logic;
-    signal ro_b_edge : std_logic;
+    signal ro_clk_a : std_logic;
+    signal ro_clk_b : std_logic;
+    signal count_enable : std_logic;
+    signal clear_counters : std_logic;
 
     type state_t is (IDLE, SELECT_RO, COUNTING, COMPARE, OUTPUT_RESULT);
     signal state : state_t;
@@ -69,23 +69,30 @@ begin
             );
     end generate gen_ro;
 
-    process(clk, rst)
+    ro_clk_a <= ro_output(selected_ro_a) when selected_ro_a < TOTAL_RO else '0';
+    ro_clk_b <= ro_output(selected_ro_b) when selected_ro_b < TOTAL_RO else '0';
+
+    process(ro_clk_a, clear_counters)
     begin
-        if rst = '1' then
-            ro_a_sync <= (others => '0');
-            ro_b_sync <= (others => '0');
-        elsif rising_edge(clk) then
-            if selected_ro_a < TOTAL_RO then
-                ro_a_sync <= ro_a_sync(1 downto 0) & ro_output(selected_ro_a);
-            end if;
-            if selected_ro_b < TOTAL_RO then
-                ro_b_sync <= ro_b_sync(1 downto 0) & ro_output(selected_ro_b);
+        if clear_counters = '1' then
+            sayac_a <= (others => '0');
+        elsif rising_edge(ro_clk_a) then
+            if count_enable = '1' then
+                sayac_a <= sayac_a + 1;
             end if;
         end if;
     end process;
 
-    ro_a_edge <= ro_a_sync(2) xor ro_a_sync(1);
-    ro_b_edge <= ro_b_sync(2) xor ro_b_sync(1);
+    process(ro_clk_b, clear_counters)
+    begin
+        if clear_counters = '1' then
+            sayac_b <= (others => '0');
+        elsif rising_edge(ro_clk_b) then
+            if count_enable = '1' then
+                sayac_b <= sayac_b + 1;
+            end if;
+        end if;
+    end process;
 
     process(clk, rst)
         variable pair_index : integer;
@@ -95,14 +102,14 @@ begin
             response_bit <= '0';
             response_valid <= '0';
             busy <= '0';
-            sayac_a <= (others => '0');
-            sayac_b <= (others => '0');
             ref_counter <= (others => '0');
             selected_ro_a <= 0;
             selected_ro_b <= 0;
             ro_aktif <= (others => '0');
             ro_count_a <= (others => '0');
             ro_count_b <= (others => '0');
+            count_enable <= '0';
+            clear_counters <= '1';
         elsif rising_edge(clk) then
             response_valid <= '0';
 
@@ -110,6 +117,8 @@ begin
                 when IDLE =>
                     busy <= '0';
                     ro_aktif <= (others => '0');
+                    count_enable <= '0';
+                    clear_counters <= '1';
                     if start = '1' then
                         state <= SELECT_RO;
                         busy <= '1';
@@ -129,23 +138,17 @@ begin
                     ro_aktif(pair_index * 2) <= '1';
                     ro_aktif(pair_index * 2 + 1) <= '1';
 
-                    sayac_a <= (others => '0');
-                    sayac_b <= (others => '0');
+                    clear_counters <= '0';
+                    count_enable <= '0';
                     ref_counter <= (others => '0');
                     state <= COUNTING;
 
                 when COUNTING =>
+                    count_enable <= '1';
                     ref_counter <= ref_counter + 1;
 
-                    if ro_a_edge = '1' then
-                        sayac_a <= sayac_a + 1;
-                    end if;
-
-                    if ro_b_edge = '1' then
-                        sayac_b <= sayac_b + 1;
-                    end if;
-
                     if ref_counter = to_unsigned(SAYMA_DONGULERI - 1, SAYICI_GENISLIGI) then
+                        count_enable <= '0';
                         ro_aktif <= (others => '0');
                         state <= COMPARE;
                     end if;

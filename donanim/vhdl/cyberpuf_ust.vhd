@@ -5,7 +5,7 @@ use work.aes_paket.ALL;
 
 entity cyberpuf_ust is
     generic (
-        RO_CIFT_SAYISI     : integer := 16;
+        RO_CIFT_SAYISI     : integer := 256;
         INVERTER_SAYISI    : integer := 3;
         SAYICI_GENISLIGI    : integer := 20;
         SAYMA_DONGULERI     : integer := 1000;

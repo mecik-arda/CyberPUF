@@ -5,15 +5,15 @@ create_clock -period 10.000 -name sys_clk -waveform {0.000 5.000} [get_ports clk
 set_property PACKAGE_PIN T22 [get_ports rst]
 set_property IOSTANDARD LVCMOS33 [get_ports rst]
 
-set_property DONT_TOUCH true [get_cells -hierarchical -filter {NAME =~ *ring_oscillator*}]
-set_property ALLOW_COMBINATORIAL_LOOPS true [get_nets -hierarchical -filter {NAME =~ *ring_oscillator*/chain*}]
+set_property DONT_TOUCH true [get_cells -hierarchical -filter {NAME =~ *halka_osilator*}]
+set_property ALLOW_COMBINATORIAL_LOOPS true [get_nets -hierarchical -filter {NAME =~ *halka_osilator*/chain*}]
 
-set_false_path -from [get_cells -hierarchical -filter {NAME =~ *ring_oscillator*/chain_reg*}]
+set_false_path -from [get_cells -hierarchical -filter {NAME =~ *halka_osilator*/chain_reg*}]
 
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -hierarchical -filter {NAME =~ *ring_oscillator*/osc_out*}]
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -hierarchical -filter {NAME =~ *halka_osilator*/osc_out*}]
 
-set_max_delay 2.000 -from [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_a_sync_reg[0]*}] -to [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_a_sync_reg[1]*}]
-set_max_delay 2.000 -from [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_b_sync_reg[0]*}] -to [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_b_sync_reg[1]*}]
+set_max_delay 2.000 -from [get_cells -hierarchical -filter {NAME =~ *ro_puf_cekirdek*/ro_a_sync_reg[0]*}] -to [get_cells -hierarchical -filter {NAME =~ *ro_puf_cekirdek*/ro_a_sync_reg[1]*}]
+set_max_delay 2.000 -from [get_cells -hierarchical -filter {NAME =~ *ro_puf_cekirdek*/ro_b_sync_reg[0]*}] -to [get_cells -hierarchical -filter {NAME =~ *ro_puf_cekirdek*/ro_b_sync_reg[1]*}]
 
 set_property LOC SLICE_X0Y0 [get_cells -hierarchical -filter {NAME =~ *gen_ro[0].ro_inst*}]
 set_property LOC SLICE_X0Y1 [get_cells -hierarchical -filter {NAME =~ *gen_ro[1].ro_inst*}]
@@ -48,5 +48,5 @@ set_property LOC SLICE_X7Y1 [get_cells -hierarchical -filter {NAME =~ *gen_ro[29
 set_property LOC SLICE_X7Y2 [get_cells -hierarchical -filter {NAME =~ *gen_ro[30].ro_inst*}]
 set_property LOC SLICE_X7Y3 [get_cells -hierarchical -filter {NAME =~ *gen_ro[31].ro_inst*}]
 
-set_property ASYNC_REG true [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_a_sync_reg[*]}]
-set_property ASYNC_REG true [get_cells -hierarchical -filter {NAME =~ *ro_puf_core*/ro_b_sync_reg[*]}]
+set_property ASYNC_REG true [get_cells -hierarchical -filter {NAME =~ *ro_puf_cekirdek*/ro_a_sync_reg[*]}]
+set_property ASYNC_REG true [get_cells -hierarchical -filter {NAME =~ *ro_puf_cekirdek*/ro_b_sync_reg[*]}]

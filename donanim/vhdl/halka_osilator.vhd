@@ -31,7 +31,7 @@ begin
     chain(0) <= not chain(INVERTER_SAYISI - 1) after 1 ns when enable = '1' else '0';
 
     gen_inverters: for i in 1 to INVERTER_SAYISI - 1 generate
-        chain(i) <= not chain(i - 1) after 1 ns;
+        chain(i) <= not chain(i - 1) after 1 ns when enable = '1' else '0';
     end generate gen_inverters;
 
     osc_out <= chain(INVERTER_SAYISI - 1);

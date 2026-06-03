@@ -82,8 +82,6 @@ architecture rtl of axi4_lite_sarmalayici is
 
     signal rst_internal    : std_logic;
 
-    signal komut_anahtar_uret   : std_logic;
-    signal komut_sifre_coz_basla  : std_logic;
     signal cmd_generate_key_r : std_logic;
     signal cmd_start_decrypt_r : std_logic;
     signal cmd_generate_key_pulse : std_logic;
@@ -383,7 +381,7 @@ begin
                     axi_rvalid <= '1';
                     axi_rresp <= "00";
 
-                    addr_index := to_integer(unsigned(axi_araddr_latched(C_S_AXI_ADDR_WIDTH - 1 downto 2)));
+                    addr_index := to_integer(unsigned(S_AXI_ARADDR(C_S_AXI_ADDR_WIDTH - 1 downto 2)));
 
                     case addr_index is
                         when 0 =>

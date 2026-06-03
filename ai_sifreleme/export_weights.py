@@ -39,7 +39,7 @@ def extract_all_weights(model):
                 'array_index': arr_idx,
                 'original_shape': list(weight_array.shape),
                 'dtype': str(weight_array.dtype),
-                'num_elements': int(np.prod(weight_array.shape)),
+                'num_elements': int(np.prod(weight_array.shape, dtype=np.int64)),
                 'size_bytes': int(weight_array.nbytes),
                 'min_value': float(np.min(weight_array)),
                 'max_value': float(np.max(weight_array)),
@@ -56,55 +56,54 @@ def extract_all_weights(model):
     return all_weight_arrays, weight_manifest, total_params
 
 
-def serialize_weights_to_binary(weight_arrays, weight_manifest):
+def serialize_weights_to_binary(weight_arrays, weight_manifest, output_path):
     MAGIC_NUMBER = b'CPUF'
     VERSION_MAJOR = 1
     VERSION_MINOR = 0
     HEADER_RESERVED = b'\x00' * 16
 
-    binary_chunks = []
+    sha256_hash = hashlib.sha256()
 
-    header = bytearray()
-    header.extend(MAGIC_NUMBER)
-    header.extend(struct.pack('<B', VERSION_MAJOR))
-    header.extend(struct.pack('<B', VERSION_MINOR))
+    with open(output_path, 'wb') as f:
+        # Header
+        header = bytearray()
+        header.extend(MAGIC_NUMBER)
+        header.extend(struct.pack('<B', VERSION_MAJOR))
+        header.extend(struct.pack('<B', VERSION_MINOR))
+        
+        total_arrays = len(weight_arrays)
+        header.extend(struct.pack('<I', total_arrays))
+        
+        total_elements = sum(int(np.prod(arr.shape, dtype=np.int64)) for arr in weight_arrays)
+        header.extend(struct.pack('<Q', total_elements))
+        header.extend(HEADER_RESERVED)
+        
+        f.write(header)
+        sha256_hash.update(header)
 
-    total_arrays = len(weight_arrays)
-    header.extend(struct.pack('<I', total_arrays))
+        # Array Metadata
+        array_metadata_block = bytearray()
+        for manifest_entry in weight_manifest:
+            for arr_info in manifest_entry['arrays']:
+                shape = arr_info['original_shape']
+                ndim = len(shape)
+                array_metadata_block.extend(struct.pack('<B', ndim))
+                for dim in shape:
+                    array_metadata_block.extend(struct.pack('<I', dim))
+                array_metadata_block.extend(struct.pack('<I', arr_info['num_elements']))
+                array_metadata_block.extend(struct.pack('<I', arr_info['size_bytes']))
+        
+        f.write(array_metadata_block)
+        sha256_hash.update(array_metadata_block)
 
-    total_elements = sum(np.prod(arr.shape) for arr in weight_arrays)
-    header.extend(struct.pack('<Q', total_elements))
+        # Weight Data Chunking
+        for arr in weight_arrays:
+            flat_arr = arr.astype(np.float32).flatten()
+            chunk = flat_arr.tobytes()
+            f.write(chunk)
+            sha256_hash.update(chunk)
 
-    header.extend(HEADER_RESERVED)
-
-    binary_chunks.append(bytes(header))
-
-    array_metadata_block = bytearray()
-
-    for manifest_entry in weight_manifest:
-        for arr_info in manifest_entry['arrays']:
-            shape = arr_info['original_shape']
-            ndim = len(shape)
-            array_metadata_block.extend(struct.pack('<B', ndim))
-            for dim in shape:
-                array_metadata_block.extend(struct.pack('<I', dim))
-            array_metadata_block.extend(struct.pack('<I', arr_info['num_elements']))
-            array_metadata_block.extend(struct.pack('<I', arr_info['size_bytes']))
-
-    binary_chunks.append(bytes(array_metadata_block))
-
-    weight_data_block = bytearray()
-    for arr in weight_arrays:
-        flat_arr = arr.astype(np.float32).flatten()
-        weight_data_block.extend(flat_arr.tobytes())
-
-    binary_chunks.append(bytes(weight_data_block))
-
-    full_binary = b''.join(binary_chunks)
-
-    sha256_hash = hashlib.sha256(full_binary).hexdigest()
-
-    return full_binary, sha256_hash
+    return sha256_hash.hexdigest()
 
 
 def save_weights_as_numpy(weight_arrays, weight_manifest, output_dir):
@@ -150,9 +149,9 @@ def save_weights_as_numpy(weight_arrays, weight_manifest, output_dir):
 def generate_weight_statistics(weight_arrays, weight_manifest):
     stats = {
         'total_arrays': int(len(weight_arrays)),
-        'total_parameters': int(sum(np.prod(arr.shape) for arr in weight_arrays)),
+        'total_parameters': int(sum(np.prod(arr.shape, dtype=np.int64) for arr in weight_arrays)),
         'total_size_bytes': int(sum(arr.nbytes for arr in weight_arrays)),
-        'total_size_float32_bytes': int(sum(np.prod(arr.shape) * 4 for arr in weight_arrays)),
+        'total_size_float32_bytes': int(sum(np.prod(arr.shape, dtype=np.int64) * 4 for arr in weight_arrays)),
         'global_min': float(min(np.min(arr) for arr in weight_arrays)),
         'global_max': float(max(np.max(arr) for arr in weight_arrays)),
         'global_mean': float(np.mean([np.mean(arr) for arr in weight_arrays])),
@@ -175,7 +174,7 @@ def generate_weight_statistics(weight_arrays, weight_manifest):
                 'max': float(np.max(arr)),
                 'mean': float(np.mean(arr)),
                 'std': float(np.std(arr)),
-                'sparsity': float(np.sum(np.abs(arr) < 1e-7) / np.prod(arr.shape)),
+                'sparsity': float(np.sum(np.abs(arr) < 1e-7) / np.prod(arr.shape, dtype=np.float64)),
                 'l1_norm': float(np.sum(np.abs(arr))),
                 'l2_norm': float(np.sqrt(np.sum(arr ** 2)))
             }
@@ -220,14 +219,10 @@ def export_weights(model_path=None):
         for arr_info in entry['arrays']:
             print(f"    -> Sekil: {arr_info['original_shape']} | Eleman: {arr_info['num_elements']:>8,} | Min: {arr_info['min_value']:+.6f} | Max: {arr_info['max_value']:+.6f}")
 
-    print("\n[3/5] Agirliklar ikili (binary) formata serilestriliyor...")
-    binary_data, sha256_hash = serialize_weights_to_binary(weight_arrays, weight_manifest)
-    print(f"  Ikili veri boyutu    : {len(binary_data):,} byte ({len(binary_data) / (1024 * 1024):.2f} MB)")
-    print(f"  SHA-256 ozeti        : {sha256_hash}")
-
+    print("\n[3/5] Agirliklar ikili (binary) formata serilestriliyor (streaming)...")
     binary_path = os.path.join(export_dir, 'cyberpuf_weights.bin')
-    with open(binary_path, 'wb') as f:
-        f.write(binary_data)
+    sha256_hash = serialize_weights_to_binary(weight_arrays, weight_manifest, binary_path)
+    print(f"  SHA-256 ozeti        : {sha256_hash}")
     print(f"  Ikili dosya kaydedildi: {binary_path}")
 
     print("\n[4/5] Agirliklar NumPy formatinda kaydediliyor...")
@@ -289,7 +284,7 @@ def export_weights(model_path=None):
     print("Sonraki adim: encrypt_weights.py ile agirliklari sifreleyin.")
     print("=" * 70)
 
-    return binary_data, weight_manifest, sha256_hash
+    return binary_path, weight_manifest, sha256_hash
 
 
 if __name__ == '__main__':

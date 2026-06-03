@@ -5,20 +5,9 @@ import struct
 import hashlib
 import numpy as np
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
 
-
-CYBERPUF_STATIC_AES_KEY = bytes([
-    0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
-    0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C,
-    0x6B, 0xC1, 0xBE, 0xE2, 0x2E, 0x40, 0x9F, 0x96,
-    0xE9, 0x3D, 0x7E, 0x11, 0x73, 0x93, 0x17, 0x2A
-])
-
-
-def derive_key_from_puf_simulation(raw_puf_key):
-    key_hash = hashlib.sha256(raw_puf_key).digest()
-    return key_hash
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from crypto_utils import get_puf_key, derive_key_from_puf_simulation
 
 
 def parse_encrypted_binary(file_path):
@@ -45,7 +34,7 @@ def parse_encrypted_binary(file_path):
     elif mode_byte == 0x02:
         encryption_mode = 'CBC'
     else:
-        raise ValueError(f"Gecersiz sifreleme modu: 0x{mode_byte:02X}")
+        raise ValueError(f"Desteklenmeyen mod: 0x{mode_byte:02X}")
 
     reserved = struct.unpack('<B', data[offset:offset + 1])[0]
     offset += 1
@@ -53,26 +42,26 @@ def parse_encrypted_binary(file_path):
     metadata_length = struct.unpack('<I', data[offset:offset + 4])[0]
     offset += 4
 
+    if metadata_length > 65536:
+        raise ValueError(f"Metadata boyutu cok buyuk: {metadata_length} byte")
+
     metadata_json = data[offset:offset + metadata_length].decode('utf-8')
     metadata = json.loads(metadata_json)
     offset += metadata_length
 
-    if encryption_mode == 'GCM':
+    if encryption_mode == 'GCM' or encryption_mode == 'CBC':
         nonce_length = struct.unpack('<B', data[offset:offset + 1])[0]
         offset += 1
         nonce = data[offset:offset + nonce_length]
         offset += nonce_length
 
-        tag_length = struct.unpack('<B', data[offset:offset + 1])[0]
-        offset += 1
-        auth_tag = data[offset:offset + tag_length]
-        offset += tag_length
-    elif encryption_mode == 'CBC':
-        iv_length = struct.unpack('<B', data[offset:offset + 1])[0]
-        offset += 1
-        nonce = data[offset:offset + iv_length]
-        offset += iv_length
-        auth_tag = b''
+        if encryption_mode == 'GCM':
+            tag_length = struct.unpack('<B', data[offset:offset + 1])[0]
+            offset += 1
+            auth_tag = data[offset:offset + tag_length]
+            offset += tag_length
+        else:
+            auth_tag = b''
 
     ciphertext_length = struct.unpack('<Q', data[offset:offset + 8])[0]
     offset += 8
@@ -101,11 +90,12 @@ def decrypt_data(ciphertext, nonce, auth_tag, aes_key, mode='GCM'):
         cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
         plaintext = cipher.decrypt_and_verify(ciphertext, auth_tag)
     elif mode == 'CBC':
-        cipher = AES.new(aes_key, AES.MODE_CBC, iv=nonce)
+        from Crypto.Util.Padding import unpad
+        cipher = AES.new(aes_key, AES.MODE_CBC, nonce)
         decrypted_padded = cipher.decrypt(ciphertext)
         plaintext = unpad(decrypted_padded, AES.block_size)
     else:
-        raise ValueError(f"Desteklenmeyen sifreleme modu: {mode}")
+        raise ValueError("Desteklenmeyen mod.")
 
     return plaintext
 
@@ -126,8 +116,14 @@ def parse_weight_binary(plaintext_data):
     total_arrays = struct.unpack('<I', plaintext_data[offset:offset + 4])[0]
     offset += 4
 
+    if total_arrays > 1000:
+        raise ValueError(f"Dizi sayisi cok buyuk: {total_arrays}")
+
     total_elements = struct.unpack('<Q', plaintext_data[offset:offset + 8])[0]
     offset += 8
+
+    if total_elements > 10**8:
+        raise ValueError(f"Toplam eleman sayisi cok buyuk: {total_elements}")
 
     reserved = plaintext_data[offset:offset + 16]
     offset += 16
@@ -242,7 +238,8 @@ def verify_encryption():
     print("-" * 70)
 
     try:
-        aes_key = derive_key_from_puf_simulation(CYBERPUF_STATIC_AES_KEY)
+        raw_puf_key = get_puf_key()
+        aes_key = derive_key_from_puf_simulation(raw_puf_key)
         print(f"  AES Anahtari (hex): {aes_key.hex()}")
 
         decrypted_data = decrypt_data(
@@ -385,12 +382,19 @@ def verify_encryption():
             aes_key,
             mode=parsed['encryption_mode']
         )
-        if parsed['encryption_mode'] == 'GCM':
-            print(f"  SONUC: BASARISIZ - Bozulmus veri GCM'de tespit edilmeliydi!")
-            test_results.append(('Dis Mudahale Tespiti', False, 'Bozulma tespit edilemedi'))
-        else:
-            print(f"  Not: CBC modunda tamper detection desteklenmez (beklenen).")
-            test_results.append(('Dis Mudahale Tespiti', True, 'CBC modu - beklenen davranis'))
+        
+        # CBC modunda padding en sonda oldugu icin ilk byte'in bozulmasi unpadding'i etkilemez.
+        # Bu yuzden SHA-256 kontrolu yapmaliyiz.
+        if parsed['encryption_mode'] == 'CBC':
+            tampered_sha256 = hashlib.sha256(tampered_decrypted).hexdigest()
+            with open(os.path.join(export_dir, 'cyberpuf_weights.bin'), 'rb') as f:
+                original_sha256 = hashlib.sha256(f.read()).hexdigest()
+                
+            if tampered_sha256 != original_sha256:
+                raise ValueError("SHA-256 Butunluk Hatasi: Bozulmus veri tespit edildi!")
+                
+        print(f"  SONUC: BASARISIZ - Bozulmus veri tespit edilemedi!")
+        test_results.append(('Dis Mudahale Tespiti', False, 'Bozulma fark edilmedi'))
     except Exception as e:
         print(f"  Bozulmus veri beklendigi gibi tespit edildi.")
         print(f"  Hata mesaji: {type(e).__name__}")

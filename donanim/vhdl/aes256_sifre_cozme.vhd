@@ -39,6 +39,7 @@ architecture rtl of aes256_sifre_cozme is
     attribute keep : string;
     attribute keep of noise_reg : signal is "true";
     signal stall_count : unsigned(1 downto 0) := "00";
+    signal free_running_counter : unsigned(15 downto 0) := x"1337";
 
 begin
 
@@ -63,6 +64,8 @@ begin
                 end loop;
             end loop;
         elsif rising_edge(clk) then
+            free_running_counter <= free_running_counter + 1;
+
             -- LFSR (16-bit Galois, taps: 16,14,13,11)
             lfsr_reg <= lfsr_reg(14 downto 0) & (lfsr_reg(15) xor lfsr_reg(13) xor lfsr_reg(12) xor lfsr_reg(10));
 
@@ -81,11 +84,11 @@ begin
                         round_num <= to_unsigned(14, 4);
                         busy <= '1';
                         
-                        -- LFSR seed'ini PUF entropisiyle baslat
-                        if tur_anahtarlari(0)(15 downto 0) = x"0000" then
+                        -- LFSR seed'ini dinamik serbest sayacla baslat
+                        if free_running_counter = x"0000" then
                             lfsr_reg <= x"ACE1";
                         else
-                            lfsr_reg <= tur_anahtarlari(0)(15 downto 0);
+                            lfsr_reg <= std_logic_vector(free_running_counter);
                         end if;
                         
                         fsm_state <= INIT_ADD_KEY;

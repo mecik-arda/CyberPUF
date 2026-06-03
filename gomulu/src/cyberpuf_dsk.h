@@ -35,7 +35,7 @@ bool CyberPUF_AnahtarUret(void);
 
 bool CyberPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin_16b);
 
-void CyberPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, uint32_t boyut_bayt);
+bool CyberPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, uint32_t boyut_bayt, const uint8_t* iv);
 
 void CyberPUF_PUFAnahtariAl(uint8_t* anahtar_tamponu_32b);
 

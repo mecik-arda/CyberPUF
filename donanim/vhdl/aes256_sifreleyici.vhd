@@ -18,7 +18,7 @@ end entity aes256_sifreleyici;
 
 architecture rtl of aes256_sifreleyici is
 
-    type state_t is (IDLE, INIT_ADD_KEY, ROUND_SUB_BYTES, ROUND_SHIFT_ROWS, ROUND_MIX_COLUMNS, ROUND_ADD_KEY, FINAL_SUB_BYTES, FINAL_SHIFT_ROWS, FINAL_ADD_KEY, FINISHED);
+    type state_t is (IDLE, INIT_ADD_KEY, ROUND_SUB_BYTES, ROUND_SHIFT_ROWS, ROUND_MIX_COLUMNS, ROUND_ADD_KEY, FINAL_ADD_KEY, FINISHED);
     signal fsm_state : state_t;
 
     signal aes_state : durum_dizisi_t;
@@ -134,11 +134,6 @@ begin
                     end loop;
                     fsm_state <= FINISHED;
 
-                when FINAL_SUB_BYTES =>
-                    fsm_state <= IDLE;
-
-                when FINAL_SHIFT_ROWS =>
-                    fsm_state <= IDLE;
 
                 when FINISHED =>
                     sifreli_metin <= durumdan_vektore(aes_state);

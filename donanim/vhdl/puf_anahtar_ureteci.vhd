@@ -5,7 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity puf_anahtar_ureteci is
     generic (
         KEY_WIDTH        : integer := 256;
-        RO_CIFT_SAYISI     : integer := 16;
+        RO_CIFT_SAYISI     : integer := 256;
         INVERTER_SAYISI    : integer := 3;
         SAYICI_GENISLIGI    : integer := 20;
         SAYMA_DONGULERI     : integer := 1000;
@@ -37,7 +37,7 @@ architecture rtl of puf_anahtar_ureteci is
     signal state : state_t;
 
     signal puf_start       : std_logic;
-    signal puf_challenge   : std_logic_vector(3 downto 0);
+    signal puf_challenge   : std_logic_vector(7 downto 0);
     signal puf_response    : std_logic;
     signal puf_valid       : std_logic;
     signal puf_mesgul        : std_logic;
@@ -46,7 +46,7 @@ architecture rtl of puf_anahtar_ureteci is
 
     signal key_reg         : std_logic_vector(KEY_WIDTH - 1 downto 0);
     signal bit_counter     : unsigned(8 downto 0);
-    signal challenge_idx   : unsigned(3 downto 0);
+    signal challenge_idx   : unsigned(7 downto 0);
     signal rep_counter     : unsigned(4 downto 0);
 
     signal accumulated_bit : unsigned(4 downto 0);
@@ -62,7 +62,7 @@ architecture rtl of puf_anahtar_ureteci is
             clk             : in  std_logic;
             rst             : in  std_logic;
             start           : in  std_logic;
-            challenge       : in  std_logic_vector(3 downto 0);
+            challenge       : in  std_logic_vector(7 downto 0);
             response_bit    : out std_logic;
             response_valid  : out std_logic;
             busy            : out std_logic;
@@ -167,7 +167,7 @@ begin
                     else
                         bit_counter <= bit_counter + 1;
 
-                        if challenge_idx = to_unsigned(RO_CIFT_SAYISI - 1, 4) then
+                        if challenge_idx = to_unsigned(RO_CIFT_SAYISI - 1, 8) then
                             challenge_idx <= (others => '0');
                         else
                             challenge_idx <= challenge_idx + 1;

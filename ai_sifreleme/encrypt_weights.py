@@ -9,35 +9,13 @@ import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from crypto_utils import get_puf_key, derive_key_from_puf_simulation
 
-CYBERPUF_STATIC_AES_KEY = bytes([
-    0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
-    0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C,
-    0x6B, 0xC1, 0xBE, 0xE2, 0x2E, 0x40, 0x9F, 0x96,
-    0xE9, 0x3D, 0x7E, 0x11, 0x73, 0x93, 0x17, 0x2A
-])
 
 ENCRYPTED_FILE_MAGIC = b'CPFE'
 ENCRYPTED_VERSION_MAJOR = 1
 ENCRYPTED_VERSION_MINOR = 0
-
-
-def derive_key_from_puf_simulation(raw_puf_key):
-    key_hash = hashlib.sha256(raw_puf_key).digest()
-    return key_hash
-
-
-def encrypt_aes256_gcm(plaintext_data, aes_key):
-    if len(aes_key) != 32:
-        raise ValueError("AES anahtari 32 byte (256-bit) olmalidir.")
-        
-    nonce = secrets.token_bytes(12)
-
-    cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
-
-    ciphertext, auth_tag = cipher.encrypt_and_digest(plaintext_data)
-
-    return ciphertext, nonce, auth_tag
 
 
 def encrypt_aes256_cbc(plaintext_data, aes_key):
@@ -45,14 +23,13 @@ def encrypt_aes256_cbc(plaintext_data, aes_key):
         raise ValueError("AES anahtari 32 byte (256-bit) olmalidir.")
         
     iv = secrets.token_bytes(16)
-
-    cipher = AES.new(aes_key, AES.MODE_CBC, iv=iv)
-
+    cipher = AES.new(aes_key, AES.MODE_CBC, iv)
     padded_data = pad(plaintext_data, AES.block_size)
-
     ciphertext = cipher.encrypt(padded_data)
 
-    return ciphertext, iv
+    return ciphertext, iv, b''
+
+
 
 
 def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
@@ -67,6 +44,8 @@ def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
         output.extend(struct.pack('<B', 0x01))
     elif mode == 'CBC':
         output.extend(struct.pack('<B', 0x02))
+    else:
+        raise ValueError("Desteklenmeyen mod.")
 
     output.extend(struct.pack('<B', 0x00))
 
@@ -74,14 +53,12 @@ def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
     output.extend(struct.pack('<I', len(metadata_json)))
     output.extend(metadata_json)
 
-    if mode == 'GCM':
+    if mode == 'GCM' or mode == 'CBC':
         output.extend(struct.pack('<B', len(nonce)))
         output.extend(nonce)
-        output.extend(struct.pack('<B', len(auth_tag)))
-        output.extend(auth_tag)
-    elif mode == 'CBC':
-        output.extend(struct.pack('<B', len(nonce)))
-        output.extend(nonce)
+        if mode == 'GCM':
+            output.extend(struct.pack('<B', len(auth_tag)))
+            output.extend(auth_tag)
 
     output.extend(struct.pack('<Q', len(ciphertext)))
     output.extend(ciphertext)
@@ -90,33 +67,23 @@ def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
 
 
 def generate_c_header(encrypted_data, output_path, array_name='encrypted_weights'):
-    lines = []
-
-    lines.append(f'#ifndef CYBERPUF_ENCRYPTED_WEIGHTS_H')
-    lines.append(f'#define CYBERPUF_ENCRYPTED_WEIGHTS_H')
-    lines.append(f'')
-    lines.append(f'#include <stdint.h>')
-    lines.append(f'')
-    lines.append(f'#define ENCRYPTED_DATA_SIZE {len(encrypted_data)}')
-    lines.append(f'')
-    lines.append(f'static const uint8_t {array_name}[ENCRYPTED_DATA_SIZE] = {{')
-
-    bytes_per_line = 16
-    for i in range(0, len(encrypted_data), bytes_per_line):
-        chunk = encrypted_data[i:i + bytes_per_line]
-        hex_values = ', '.join(f'0x{b:02X}' for b in chunk)
-        if i + bytes_per_line < len(encrypted_data):
-            lines.append(f'    {hex_values},')
-        else:
-            lines.append(f'    {hex_values}')
-
-    lines.append(f'}};')
-    lines.append(f'')
-    lines.append(f'#endif')
-    lines.append(f'')
-
     with open(output_path, 'w') as f:
-        f.write('\n'.join(lines))
+        f.write(f'#ifndef CYBERPUF_ENCRYPTED_WEIGHTS_H\n')
+        f.write(f'#define CYBERPUF_ENCRYPTED_WEIGHTS_H\n\n')
+        f.write(f'#include <stdint.h>\n\n')
+        f.write(f'#define ENCRYPTED_DATA_SIZE {len(encrypted_data)}\n\n')
+        f.write(f'static const uint8_t {array_name}[ENCRYPTED_DATA_SIZE] = {{\n')
+
+        bytes_per_line = 16
+        for i in range(0, len(encrypted_data), bytes_per_line):
+            chunk = encrypted_data[i:i + bytes_per_line]
+            hex_values = ', '.join(f'0x{b:02X}' for b in chunk)
+            if i + bytes_per_line < len(encrypted_data):
+                f.write(f'    {hex_values},\n')
+            else:
+                f.write(f'    {hex_values}\n')
+
+        f.write(f'}};\n\n#endif\n')
 
     return output_path
 
@@ -135,82 +102,60 @@ def generate_c_header_chunked(encrypted_data, output_dir, array_name='encrypted_
         chunk_filename = f'{array_name}_chunk_{chunk_idx:04d}.h'
         chunk_path = os.path.join(output_dir, chunk_filename)
 
-        lines = []
-        guard = f'CYBERPUF_{array_name.upper()}_CHUNK_{chunk_idx:04d}_H'
-        lines.append(f'#ifndef {guard}')
-        lines.append(f'#define {guard}')
-        lines.append(f'')
-        lines.append(f'#include <stdint.h>')
-        lines.append(f'')
-        lines.append(f'#define CHUNK_{chunk_idx:04d}_SIZE {len(chunk_data)}')
-        lines.append(f'#define CHUNK_{chunk_idx:04d}_OFFSET {start}')
-        lines.append(f'')
-        lines.append(f'static const uint8_t {array_name}_chunk_{chunk_idx:04d}[CHUNK_{chunk_idx:04d}_SIZE] = {{')
-
-        bytes_per_line = 16
-        for i in range(0, len(chunk_data), bytes_per_line):
-            sub_chunk = chunk_data[i:i + bytes_per_line]
-            hex_values = ', '.join(f'0x{b:02X}' for b in sub_chunk)
-            if i + bytes_per_line < len(chunk_data):
-                lines.append(f'    {hex_values},')
-            else:
-                lines.append(f'    {hex_values}')
-
-        lines.append(f'}};')
-        lines.append(f'')
-        lines.append(f'#endif')
-        lines.append(f'')
-
         with open(chunk_path, 'w') as f:
-            f.write('\n'.join(lines))
+            guard = f'CYBERPUF_{array_name.upper()}_CHUNK_{chunk_idx:04d}_H'
+            f.write(f'#ifndef {guard}\n')
+            f.write(f'#define {guard}\n\n')
+            f.write(f'#include <stdint.h>\n\n')
+            f.write(f'#define CHUNK_{chunk_idx:04d}_SIZE {len(chunk_data)}\n')
+            f.write(f'#define CHUNK_{chunk_idx:04d}_OFFSET {start}\n\n')
+            f.write(f'static const uint8_t {array_name}_chunk_{chunk_idx:04d}[CHUNK_{chunk_idx:04d}_SIZE] = {{\n')
+
+            bytes_per_line = 16
+            for i in range(0, len(chunk_data), bytes_per_line):
+                sub_chunk = chunk_data[i:i + bytes_per_line]
+                hex_values = ', '.join(f'0x{b:02X}' for b in sub_chunk)
+                if i + bytes_per_line < len(chunk_data):
+                    f.write(f'    {hex_values},\n')
+                else:
+                    f.write(f'    {hex_values}\n')
+
+            f.write(f'}};\n\n#endif\n')
 
         chunk_files.append(chunk_path)
 
     master_header_path = os.path.join(output_dir, f'{array_name}_master.h')
-    master_lines = []
-    master_guard = f'CYBERPUF_{array_name.upper()}_MASTER_H'
-    master_lines.append(f'#ifndef {master_guard}')
-    master_lines.append(f'#define {master_guard}')
-    master_lines.append(f'')
-    master_lines.append(f'#include <stdint.h>')
-    master_lines.append(f'')
-    master_lines.append(f'#define TOTAL_ENCRYPTED_SIZE {len(encrypted_data)}')
-    master_lines.append(f'#define TOTAL_CHUNKS {num_chunks}')
-    master_lines.append(f'#define CHUNK_SIZE {chunk_size}')
-    master_lines.append(f'')
-
-    for chunk_idx in range(num_chunks):
-        chunk_filename = f'{array_name}_chunk_{chunk_idx:04d}.h'
-        master_lines.append(f'#include "{chunk_filename}"')
-
-    master_lines.append(f'')
-
-    master_lines.append(f'static const uint8_t* {array_name}_chunks[TOTAL_CHUNKS] = {{')
-    for chunk_idx in range(num_chunks):
-        if chunk_idx < num_chunks - 1:
-            master_lines.append(f'    {array_name}_chunk_{chunk_idx:04d},')
-        else:
-            master_lines.append(f'    {array_name}_chunk_{chunk_idx:04d}')
-    master_lines.append(f'}};')
-    master_lines.append(f'')
-
-    master_lines.append(f'static const uint32_t {array_name}_chunk_sizes[TOTAL_CHUNKS] = {{')
-    for chunk_idx in range(num_chunks):
-        start = chunk_idx * chunk_size
-        end = min(start + chunk_size, len(encrypted_data))
-        size = end - start
-        if chunk_idx < num_chunks - 1:
-            master_lines.append(f'    {size},')
-        else:
-            master_lines.append(f'    {size}')
-    master_lines.append(f'}};')
-    master_lines.append(f'')
-
-    master_lines.append(f'#endif')
-    master_lines.append(f'')
-
     with open(master_header_path, 'w') as f:
-        f.write('\n'.join(master_lines))
+        master_guard = f'CYBERPUF_{array_name.upper()}_MASTER_H'
+        f.write(f'#ifndef {master_guard}\n')
+        f.write(f'#define {master_guard}\n\n')
+        f.write(f'#include <stdint.h>\n\n')
+        f.write(f'#define TOTAL_ENCRYPTED_SIZE {len(encrypted_data)}\n')
+        f.write(f'#define TOTAL_CHUNKS {num_chunks}\n')
+        f.write(f'#define CHUNK_SIZE {chunk_size}\n\n')
+
+        for chunk_idx in range(num_chunks):
+            chunk_filename = f'{array_name}_chunk_{chunk_idx:04d}.h'
+            f.write(f'#include "{chunk_filename}"\n')
+
+        f.write(f'\nstatic const uint8_t* {array_name}_chunks[TOTAL_CHUNKS] = {{\n')
+        for chunk_idx in range(num_chunks):
+            if chunk_idx < num_chunks - 1:
+                f.write(f'    {array_name}_chunk_{chunk_idx:04d},\n')
+            else:
+                f.write(f'    {array_name}_chunk_{chunk_idx:04d}\n')
+        f.write(f'}};\n\n')
+
+        f.write(f'static const uint32_t {array_name}_chunk_sizes[TOTAL_CHUNKS] = {{\n')
+        for chunk_idx in range(num_chunks):
+            start = chunk_idx * chunk_size
+            end = min(start + chunk_size, len(encrypted_data))
+            size = end - start
+            if chunk_idx < num_chunks - 1:
+                f.write(f'    {size},\n')
+            else:
+                f.write(f'    {size}\n')
+        f.write(f'}};\n\n#endif\n')
 
     chunk_files.append(master_header_path)
     return chunk_files
@@ -247,18 +192,18 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     print(f"  SHA-256 ozeti : {plaintext_sha256}")
 
     print("\n[2/7] PUF simule edilen AES-256 anahtari hazirlaniyor...")
-    aes_key = derive_key_from_puf_simulation(CYBERPUF_STATIC_AES_KEY)
+    raw_puf_key = get_puf_key()
+    aes_key = derive_key_from_puf_simulation(raw_puf_key)
     print(f"  Anahtar uzunlugu : {len(aes_key) * 8} bit")
     print(f"  Anahtar (hex)    : {aes_key.hex()}")
-    print(f"  Not: Bu statik anahtar, Faz 2'de FPGA uzerindeki RO-PUF tarafindan")
-    print(f"       uretilen donanim-ozgu anahtarla degistirilecektir.")
+    print(f"  Not: Bu anahtar ortam degiskeninden (veya fallback) alindi.")
 
     key_info_path = os.path.join(encrypt_dir, 'puf_simulated_key.json')
     key_info = {
         'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'description': 'PUF simulated AES-256 key (to be replaced by hardware PUF in Phase 2)',
-        'raw_key_hex': CYBERPUF_STATIC_AES_KEY.hex(),
+        'raw_key_hex': raw_puf_key.hex(),
         'derived_key_hex': aes_key.hex(),
         'key_length_bits': len(aes_key) * 8,
         'derivation_method': 'SHA-256',
@@ -272,15 +217,13 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
 
     if encryption_mode == 'GCM':
         ciphertext, nonce, auth_tag = encrypt_aes256_gcm(plaintext_data, aes_key)
-        print(f"  Sifreli veri boyutu  : {len(ciphertext):,} byte")
-        print(f"  Nonce (12 byte, hex) : {nonce.hex()}")
-        print(f"  Auth Tag (16 byte)   : {auth_tag.hex()}")
     elif encryption_mode == 'CBC':
-        ciphertext, nonce = encrypt_aes256_cbc(plaintext_data, aes_key)
-        auth_tag = b''
-        print(f"  Sifreli veri boyutu  : {len(ciphertext):,} byte")
-        print(f"  IV (16 byte, hex)    : {nonce.hex()}")
-        print(f"  Not: CBC modunda padding eklendi ({len(ciphertext) - len(plaintext_data)} byte)")
+        ciphertext, nonce, auth_tag = encrypt_aes256_cbc(plaintext_data, aes_key)
+    else:
+        raise ValueError("Desteklenmeyen mod.")
+        
+    print(f"  Sifreli veri boyutu  : {len(ciphertext):,} byte")
+    print(f"  IV/Nonce (hex)       : {nonce.hex()}")
 
     ciphertext_sha256 = hashlib.sha256(ciphertext).hexdigest()
     print(f"  Sifreleme SHA-256    : {ciphertext_sha256}")
@@ -292,7 +235,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
         decrypted_data = verify_cipher.decrypt_and_verify(ciphertext, auth_tag)
     elif encryption_mode == 'CBC':
         from Crypto.Util.Padding import unpad
-        verify_cipher = AES.new(aes_key, AES.MODE_CBC, iv=nonce)
+        verify_cipher = AES.new(aes_key, AES.MODE_CBC, nonce)
         decrypted_padded = verify_cipher.decrypt(ciphertext)
         decrypted_data = unpad(decrypted_padded, AES.block_size)
 

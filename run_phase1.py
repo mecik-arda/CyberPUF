@@ -3,7 +3,7 @@ import sys
 import time
 
 
-def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='GCM'):
+def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='CBC'):
     print("=" * 70)
     print("CyberPUF - Faz 1: Tam Pipeline Calistirma")
     print("Gelistirici: Arda Mecik")
@@ -30,7 +30,7 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
                 try:
                     os.remove(dosya)
                     print(f"    - Silindi: {dosya}")
-                except:
+                except OSError:
                     pass
 
     print("\n\n")
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     pipeline_epoch_sayisi = 50
     pipeline_yigin_boyutu = 128
     pipeline_ogrenme_orani = 0.001
-    pipeline_modu = 'GCM'
+    pipeline_modu = 'CBC'
 
     if len(sys.argv) > 1:
         pipeline_epoch_sayisi = int(sys.argv[1])

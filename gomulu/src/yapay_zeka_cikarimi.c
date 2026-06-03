@@ -3,30 +3,47 @@
 #include "xil_printf.h"
 #include <string.h>
 
+#include <stdlib.h>
+
 #define MAKS_TAMPON_BOYUTU (32 * 32 * 256)
 
-static float tampon1[MAKS_TAMPON_BOYUTU];
-static float tampon2[MAKS_TAMPON_BOYUTU];
+static float* tampon1 = NULL;
+static float* tampon2 = NULL;
 
 void Conv2D_3x3_Same(const float* giris, float* cikis, const ConvLayerParams* params, int giris_y, int giris_g, int giris_k, int cikis_k) {
     for (int h = 0; h < giris_y; h++) {
         for (int w = 0; w < giris_g; w++) {
             for (int ck = 0; ck < cikis_k; ck++) {
-                float toplam = params->b[ck];
-                for (int cy = -1; cy <= 1; cy++) {
-                    for (int cg = -1; cg <= 1; cg++) {
-                        int r = h + cy;
-                        int c = w + cg;
-                        if (r >= 0 && r < giris_y && c >= 0 && c < giris_g) {
-                            for (int gk = 0; gk < giris_k; gk++) {
-                                int a_indeks = ((cy + 1) * 3 + (cg + 1)) * (giris_k * cikis_k) + gk * cikis_k + ck;
-                                int g_indeks = (r * giris_g + c) * giris_k + gk;
-                                toplam += giris[g_indeks] * params->w[a_indeks];
-                            }
+                cikis[(h * giris_g + w) * cikis_k + ck] = params->b[ck];
+            }
+        }
+    }
+    
+    for (int cy = -1; cy <= 1; cy++) {
+        for (int cg = -1; cg <= 1; cg++) {
+            int cy_idx = (cy + 1) * 3 + (cg + 1);
+            int w_offset = cy_idx * giris_k * cikis_k;
+            
+            for (int h = 0; h < giris_y; h++) {
+                int r = h + cy;
+                if (r < 0 || r >= giris_y) continue;
+                
+                for (int w = 0; w < giris_g; w++) {
+                    int c = w + cg;
+                    if (c < 0 || c >= giris_g) continue;
+                    
+                    int g_base = (r * giris_g + c) * giris_k;
+                    int out_idx = (h * giris_g + w) * cikis_k;
+                    
+                    for (int gk = 0; gk < giris_k; gk++) {
+                        float g_val = giris[g_base + gk];
+                        int w_base = w_offset + gk * cikis_k;
+                        
+                        for (int ck = 0; ck < cikis_k; ck++) {
+                            cikis[out_idx + ck] += g_val * params->w[w_base + ck];
                         }
                     }
                 }
-                cikis[(h * giris_g + w) * cikis_k + ck] = toplam;
             }
         }
     }
@@ -48,15 +65,21 @@ float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut) {
     
     uint8_t ver_major = cozulmus_veri[ofset++];
     uint8_t ver_minor = cozulmus_veri[ofset++];
+    if (ver_major != 1) return NULL;
     
     uint32_t toplam_diziler;
     memcpy(&toplam_diziler, &cozulmus_veri[ofset], sizeof(uint32_t));
     ofset += 4;
     
+    if (toplam_diziler > 100) return NULL;
+    
     uint64_t toplam_elemanlar;
     memcpy(&toplam_elemanlar, &cozulmus_veri[ofset], sizeof(uint64_t));
     ofset += 8;
     
+    if (toplam_elemanlar * sizeof(float) > toplam_boyut - ofset) return NULL;
+    
+    if (ofset + 16 > toplam_boyut) return NULL;
     ofset += 16;
     
     for (uint32_t i = 0; i < toplam_diziler; i++) {
@@ -73,6 +96,7 @@ float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut) {
     
     if (ofset >= toplam_boyut) return NULL;
     
+    if (ofset % sizeof(float) != 0) return NULL;
     return (float*)&cozulmus_veri[ofset];
 }
 
@@ -86,7 +110,7 @@ void BatchNorm_ReLU(float* data, const ConvLayerParams* params, int h, int w, in
             float gamma = params->gamma[ch];
             float beta = params->beta[ch];
             
-            deger = gamma * (deger - m) / sqrtf(v + epsilon) + beta;
+            deger = gamma * (deger - m) / sqrtf(fabsf(v) + epsilon) + beta;
             
             if (deger < 0.0f) {
                 deger = 0.0f;
@@ -139,7 +163,7 @@ void BatchNorm_ReLU_Dense(float* data, const DenseLayerParams* params, int ozell
         float gamma = params->gamma[i];
         float beta = params->beta[i];
         
-        deger = gamma * (deger - m) / sqrtf(v + epsilon) + beta;
+        deger = gamma * (deger - m) / sqrtf(fabsf(v) + epsilon) + beta;
         
         if (deger < 0.0f) {
             deger = 0.0f;
@@ -172,7 +196,10 @@ void Dense_Final_Softmax(const float* giris, float* cikis, const DenseFinalParam
     }
 }
 
-static float* ConvParametreleriniCikar(float* ptr, ConvLayerParams* p, int giris_k, int cikis_k) {
+static float* ConvParametreleriniCikar(float* ptr, ConvLayerParams* p, int giris_k, int cikis_k, uint32_t* kapasite) {
+    uint32_t gereken = (3 * 3 * giris_k * cikis_k) + 5 * cikis_k;
+    if (*kapasite < gereken) return NULL;
+    *kapasite -= gereken;
     p->w = ptr; ptr += (3 * 3 * giris_k * cikis_k);
     p->b = ptr; ptr += cikis_k;
     p->gamma = ptr; ptr += cikis_k;
@@ -182,7 +209,10 @@ static float* ConvParametreleriniCikar(float* ptr, ConvLayerParams* p, int giris
     return ptr;
 }
 
-static float* DenseParametreleriniCikar(float* ptr, DenseLayerParams* p, int in_f, int out_f) {
+static float* DenseParametreleriniCikar(float* ptr, DenseLayerParams* p, int in_f, int out_f, uint32_t* kapasite) {
+    uint32_t gereken = (in_f * out_f) + 5 * out_f;
+    if (*kapasite < gereken) return NULL;
+    *kapasite -= gereken;
     p->w = ptr; ptr += (in_f * out_f);
     p->b = ptr; ptr += out_f;
     p->gamma = ptr; ptr += out_f;
@@ -192,22 +222,42 @@ static float* DenseParametreleriniCikar(float* ptr, DenseLayerParams* p, int in_
     return ptr;
 }
 
-void CyberPUF_CNN_Calistir(const float* giris_goruntusu, float* ham_agirliklar, float* cikis_olasiliklari) {
+void CyberPUF_CNN_Calistir(const float* giris_goruntusu, float* ham_agirliklar, uint32_t agirlik_kapasitesi, float* cikis_olasiliklari) {
     float* w_ptr = ham_agirliklar;
     ConvLayerParams conv1_1, conv1_2, conv2_1, conv2_2, conv3_1, conv3_2;
     DenseLayerParams dense1, dense2;
     DenseFinalParams final_dense;
 
-    w_ptr = ConvParametreleriniCikar(w_ptr, &conv1_1, 3, 64);
-    w_ptr = ConvParametreleriniCikar(w_ptr, &conv1_2, 64, 64);
-    w_ptr = ConvParametreleriniCikar(w_ptr, &conv2_1, 64, 128);
-    w_ptr = ConvParametreleriniCikar(w_ptr, &conv2_2, 128, 128);
-    w_ptr = ConvParametreleriniCikar(w_ptr, &conv3_1, 128, 256);
-    w_ptr = ConvParametreleriniCikar(w_ptr, &conv3_2, 256, 256);
+    tampon1 = (float*)malloc(MAKS_TAMPON_BOYUTU * sizeof(float));
+    tampon2 = (float*)malloc(MAKS_TAMPON_BOYUTU * sizeof(float));
+    if (!tampon1 || !tampon2) {
+        xil_printf("HATA: tampon1/tampon2 malloc basarisiz.\n");
+        if(tampon1) free(tampon1);
+        if(tampon2) free(tampon2);
+        return;
+    }
 
-    w_ptr = DenseParametreleriniCikar(w_ptr, &dense1, 4096, 512);
-    w_ptr = DenseParametreleriniCikar(w_ptr, &dense2, 512, 256);
+    uint32_t kalan_kapasite = agirlik_kapasitesi;
 
+    w_ptr = ConvParametreleriniCikar(w_ptr, &conv1_1, 3, 64, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+    w_ptr = ConvParametreleriniCikar(w_ptr, &conv1_2, 64, 64, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+    w_ptr = ConvParametreleriniCikar(w_ptr, &conv2_1, 64, 128, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+    w_ptr = ConvParametreleriniCikar(w_ptr, &conv2_2, 128, 128, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+    w_ptr = ConvParametreleriniCikar(w_ptr, &conv3_1, 128, 256, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+    w_ptr = ConvParametreleriniCikar(w_ptr, &conv3_2, 256, 256, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+
+    w_ptr = DenseParametreleriniCikar(w_ptr, &dense1, 4096, 512, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+    w_ptr = DenseParametreleriniCikar(w_ptr, &dense2, 512, 256, &kalan_kapasite);
+    if (!w_ptr) goto coker;
+
+    if (kalan_kapasite < (256 * 10) + 10) goto coker;
     final_dense.w = w_ptr; w_ptr += (256 * 10);
     final_dense.b = w_ptr; w_ptr += 10;
 
@@ -242,4 +292,17 @@ void CyberPUF_CNN_Calistir(const float* giris_goruntusu, float* ham_agirliklar, 
     BatchNorm_ReLU_Dense(tampon1, &dense2, 256);
 
     Dense_Final_Softmax(tampon1, cikis_olasiliklari, &final_dense, 256, 10);
+    
+    free(tampon1);
+    free(tampon2);
+    tampon1 = NULL;
+    tampon2 = NULL;
+    return;
+
+coker:
+    xil_printf("HATA: Agirlik bellegi sinir disi (OOB read) engellendi.\n");
+    if(tampon1) free(tampon1);
+    if(tampon2) free(tampon2);
+    tampon1 = NULL;
+    tampon2 = NULL;
 }
