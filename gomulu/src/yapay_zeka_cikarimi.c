@@ -62,7 +62,11 @@ float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut) {
     for (uint32_t i = 0; i < toplam_diziler; i++) {
         if (ofset >= toplam_boyut) return NULL;
         uint8_t ndim = cozulmus_veri[ofset++];
+
+        // Integer overflow ve sinir disi erisim kontrolu
+        if (ndim > (toplam_boyut - ofset) / 4) return NULL;
         ofset += ndim * 4;
+
         if (ofset + 8 > toplam_boyut) return NULL;
         ofset += 8;
     }

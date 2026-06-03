@@ -70,8 +70,15 @@ const uint32_t SIFRELI_VERI_BOYUTU = 64;
 #endif
 
 
-uint32_t CPFE_Header_Oku(const uint8_t* tampon, uint8_t* nonce, uint32_t* metadata_boyutu) {
+uint32_t CPFE_Header_Oku(const uint8_t* tampon, size_t tampon_boyutu, uint8_t* nonce, uint32_t* metadata_boyutu) {
     uint32_t offset = 0;
+
+    // Minimum baslik boyutu kontrolu (magic + version + mode + reserved = 8 bayt)
+    if (tampon_boyutu < 8) {
+        xil_printf("HATA: Tampon boyutu cok kucuk.\n");
+        return 0;
+    }
+
     if (tampon[0] != 'C' || tampon[1] != 'P' || tampon[2] != 'F' || tampon[3] != 'E') {
         xil_printf("HATA: Gecersiz CPFE magic number.\n");
         return 0;
@@ -81,21 +88,38 @@ uint32_t CPFE_Header_Oku(const uint8_t* tampon, uint8_t* nonce, uint32_t* metada
     uint8_t mode = tampon[offset++];
     offset += 1; // reserved
     
+    if (offset + 4 > tampon_boyutu) return 0;
     memcpy(metadata_boyutu, &tampon[offset], 4);
     offset += 4;
+
+    // Metadata boyutu sinir kontrolu
+    if (offset + *metadata_boyutu > tampon_boyutu) {
+        xil_printf("HATA: metadata_boyutu tampon sinirini asiyor.\n");
+        return 0;
+    }
     offset += *metadata_boyutu;
     
+    if (offset + 1 > tampon_boyutu) return 0;
     uint8_t nonce_len = tampon[offset++];
+
+    // Nonce uzunlugu sinir kontrolu
+    if (nonce_len > 16 || offset + nonce_len > tampon_boyutu) {
+        xil_printf("HATA: nonce_len sinir disi.\n");
+        return 0;
+    }
     if (nonce) {
         memcpy(nonce, &tampon[offset], nonce_len);
     }
     offset += nonce_len;
     
     if (mode == 0x01) { // GCM
+        if (offset + 1 > tampon_boyutu) return 0;
         uint8_t tag_len = tampon[offset++];
+        if (offset + tag_len > tampon_boyutu) return 0;
         offset += tag_len;
     }
     
+    if (offset + 8 > tampon_boyutu) return 0;
     offset += 8; // ciphertext_length
     return offset;
 }
@@ -170,7 +194,7 @@ int main(void) {
     
     uint8_t nonce[16];
     uint32_t metadata_boyutu = 0;
-    uint32_t ciphertext_offset = CPFE_Header_Oku(sifreli_agirliklar, nonce, &metadata_boyutu);
+    uint32_t ciphertext_offset = CPFE_Header_Oku(sifreli_agirliklar, (size_t)SIFRELI_VERI_BOYUTU, nonce, &metadata_boyutu);
     if (ciphertext_offset == 0) {
         free(cozulmus_bellek);
         return -1;

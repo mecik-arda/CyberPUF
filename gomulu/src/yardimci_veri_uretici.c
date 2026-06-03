@@ -57,7 +57,11 @@ static int Hamming84_HataDuzelt(uint8_t gurultulu_d, uint8_t orijinal_p, uint8_t
 
 void FuzzyExtractor_Kayit(const uint8_t* puf_ham_anahtar, YardimciVeri* yardimci_veri, uint8_t* guvenli_anahtar) {
     // 1. Rastgele bir guvenli anahtar (AES anahtari) uret.
-    uint32_t seed_val = puf_ham_anahtar[0] | (puf_ham_anahtar[1] << 8) | (puf_ham_anahtar[2] << 16) | (puf_ham_anahtar[3] << 24);
+    // Tum 32 bayti rotation-XOR ile harmanlayarak entropi kaybi onlenir.
+    uint32_t seed_val = 0;
+    for (int i = 0; i < 32; i++) {
+        seed_val ^= ((uint32_t)puf_ham_anahtar[i]) << ((i % 4) * 8);
+    }
     srand(seed_val);
     for (int i = 0; i < PUF_ANAHTAR_BOYUTU; i++) {
         guvenli_anahtar[i] = rand() & 0xFF;

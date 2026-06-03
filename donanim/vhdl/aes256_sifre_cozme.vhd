@@ -25,9 +25,6 @@ architecture rtl of aes256_sifre_cozme is
         INV_SUB_BYTES,
         INV_ADD_KEY,
         INV_MIX_COLUMNS,
-        FINAL_INV_SHIFT_ROWS,
-        FINAL_INV_SUB_BYTES,
-        FINAL_ADD_KEY,
         RANDOM_STALL,
         FINISHED
     );
@@ -173,14 +170,6 @@ begin
                     round_num <= round_num - 1;
                     fsm_state <= INV_SHIFT_ROWS;
 
-                when FINAL_INV_SHIFT_ROWS =>
-                    fsm_state <= IDLE;
-
-                when FINAL_INV_SUB_BYTES =>
-                    fsm_state <= IDLE;
-
-                when FINAL_ADD_KEY =>
-                    fsm_state <= IDLE;
 
                 when FINISHED =>
                     duz_metin <= durumdan_vektore(aes_state);
