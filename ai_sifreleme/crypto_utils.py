@@ -1,5 +1,6 @@
 import os
 import hashlib
+import secrets
 
 def get_puf_key():
     """Returns the PUF key from environment variable."""
@@ -12,7 +13,23 @@ def get_puf_key():
             
     raise EnvironmentError("CYBERPUF_AES_KEY environment variable is not set. Fail-fast triggered.")
 
-def derive_key_from_puf_simulation(raw_puf_key):
-    """Derives a 256-bit AES key from the raw PUF response using PBKDF2-HMAC-SHA256."""
-    salt = b'CyberPUF_Phase1_Salt_Constant'
-    return hashlib.pbkdf2_hmac('sha256', raw_puf_key, salt, 100000, dklen=32)
+def derive_key_from_puf_simulation(puf_raw_data, salt=None):
+    """
+    Derives a 256-bit AES key from the raw PUF response using PBKDF2-HMAC-SHA256.
+    
+    IMPORTANT: The generated or provided salt MUST be persisted alongside the 
+    ciphertext (e.g., in metadata) to ensure the exact same key can be derived 
+    during decryption. Without the original salt, decryption will fail.
+    """
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    
+    # NIST tavsiyesi: Modern sistemler icin 600,000 iterasyon
+    key = hashlib.pbkdf2_hmac(
+        'sha256',
+        puf_raw_data,
+        salt,
+        600000,
+        dklen=32
+    )
+    return key, salt

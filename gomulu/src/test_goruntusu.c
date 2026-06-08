@@ -1,4 +1,5 @@
 #include "test_goruntusu.h"
+// Test amaçlı minimal veri, production'da gerçek CIFAR-10 görüntüsü kullanılmalıdır.
 
 const float test_goruntusu_cifar10[32 * 32 * 3] = {
     0.1f, -0.2f, 0.5f, -0.1f, 0.9f, 0.3f,

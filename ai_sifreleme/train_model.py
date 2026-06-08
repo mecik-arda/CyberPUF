@@ -124,12 +124,19 @@ def create_data_augmentation():
         fill_mode='nearest'
     )
     return veri_ureticisi
-
+class SyslogCallback(callbacks.Callback):
+    def on_epoch_begin(self, epoch, logs=None):
+        print(f"--- Epoch {epoch+1} Basladi ---")
+    def on_batch_end(self, batch, logs=None):
+        if batch > 0 and batch % 50 == 0:
+            acc = logs.get('accuracy', 0)
+            loss = logs.get('loss', 0)
+            print(f"Step {batch:03d} -> loss: {loss:.4f}, acc: {acc:.4f}")
 
 def setup_callbacks(cikis_dizini):
     kontrol_noktasi_yolu = os.path.join(cikis_dizini, 'best_model.weights.h5')
 
-    geri_cagri_listesi = []
+    geri_cagri_listesi = [SyslogCallback()]
 
     geri_cagri_listesi.append(callbacks.ModelCheckpoint(
         filepath=kontrol_noktasi_yolu,
@@ -218,11 +225,10 @@ def train_model(epochs=100, batch_size=128, learning_rate=0.001):
 
     gecmis = model.fit(
         veri_ureticisi.flow(x_egitim, y_egitim, batch_size=batch_size),
-        steps_per_epoch=len(x_egitim) // batch_size,
         epochs=epochs,
         validation_data=(x_test, y_test),
         callbacks=geri_cagri_listesi,
-        verbose=1
+        verbose=2
     )
 
     print("\n[6/6] Egitim tamamlandi. Sonuclar degerlendiriliyor...")
@@ -230,7 +236,7 @@ def train_model(epochs=100, batch_size=128, learning_rate=0.001):
     print(f"  Test kaybi (loss)   : {test_kaybi:.4f}")
     print(f"  Test dogrulugu (acc): {test_dogrulugu:.4f}")
 
-    tam_model_yolu = os.path.join(cikis_dizini, 'cyberpuf_cifar10_model.h5')
+    tam_model_yolu = os.path.join(cikis_dizini, 'cyberpuf_cifar10_model.keras')
     model.save(tam_model_yolu)
     print(f"  Tam model kaydedildi: {tam_model_yolu}")
 
@@ -267,17 +273,17 @@ def train_model(epochs=100, batch_size=128, learning_rate=0.001):
         json.dump(egitim_ozeti, f, indent=2)
     print(f"  Egitim ozeti kaydedildi: {ozet_yolu}")
 
-    toplam_parametre = model.count_params()
-    egitilebilir_parametre = sum(
-        tf.keras.backend.count_params(w) for w in model.trainable_weights
-    )
+    toplam_parametre = int(sum(np.prod(w.shape) for w in model.weights))
+    egitilebilir_parametre = int(sum(
+        np.prod(w.shape) for w in model.trainable_weights
+    ))
     dondurulan_parametre = toplam_parametre - egitilebilir_parametre
 
     print("\n" + "=" * 70)
     print("MODEL ISTATISTIKLERI")
     print("=" * 70)
     print(f"  Toplam parametre    : {toplam_parametre:,}")
-    print(f"  Egitilebiir param.  : {egitilebilir_parametre:,}")
+    print(f"  Egitilebilir param. : {egitilebilir_parametre:,}")
     print(f"  Dondurulan param.   : {dondurulan_parametre:,}")
     print(f"  Tahm. bellek (MB)   : {(toplam_parametre * 4) / (1024 * 1024):.2f}")
     print("=" * 70)
@@ -327,12 +333,19 @@ if __name__ == '__main__':
     custom_batch_size = 128
     custom_lr = 0.001
 
-    if len(sys.argv) > 1:
-        custom_epochs = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        custom_batch_size = int(sys.argv[2])
-    if len(sys.argv) > 3:
-        custom_lr = float(sys.argv[3])
+    try:
+        if len(sys.argv) > 1:
+            custom_epochs = int(sys.argv[1])
+            if custom_epochs <= 0: raise ValueError("Epochs > 0 olmali")
+        if len(sys.argv) > 2:
+            custom_batch_size = int(sys.argv[2])
+            if custom_batch_size <= 0: raise ValueError("Batch size > 0 olmali")
+        if len(sys.argv) > 3:
+            custom_lr = float(sys.argv[3])
+            if custom_lr <= 0: raise ValueError("Learning rate > 0 olmali")
+    except ValueError as e:
+        print(f"HATA: Gecersiz arguman: {e}")
+        sys.exit(1)
 
     trained_model, training_history = train_model(
         epochs=custom_epochs,

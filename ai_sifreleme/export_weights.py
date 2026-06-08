@@ -56,11 +56,11 @@ def extract_all_weights(model):
     return all_weight_arrays, weight_manifest, total_params
 
 
-def serialize_weights_to_binary(weight_arrays, weight_manifest, output_path):
+def serialize_weights_to_binary(weight_arrays, weight_manifest, output_path, mode=0):
     MAGIC_NUMBER = b'CPUF'
     VERSION_MAJOR = 1
-    VERSION_MINOR = 0
-    HEADER_RESERVED = b'\x00' * 16
+    VERSION_MINOR = 2
+    HEADER_RESERVED = b'\x00' * 15
 
     sha256_hash = hashlib.sha256()
 
@@ -70,6 +70,7 @@ def serialize_weights_to_binary(weight_arrays, weight_manifest, output_path):
         header.extend(MAGIC_NUMBER)
         header.extend(struct.pack('<B', VERSION_MAJOR))
         header.extend(struct.pack('<B', VERSION_MINOR))
+        header.extend(struct.pack('<B', mode))
         
         total_arrays = len(weight_arrays)
         header.extend(struct.pack('<I', total_arrays))
@@ -83,23 +84,48 @@ def serialize_weights_to_binary(weight_arrays, weight_manifest, output_path):
 
         # Array Metadata
         array_metadata_block = bytearray()
+        arr_counter = 0
+        scales_cache = []
         for manifest_entry in weight_manifest:
             for arr_info in manifest_entry['arrays']:
+                arr = weight_arrays[arr_counter]
                 shape = arr_info['original_shape']
                 ndim = len(shape)
+                
+                if mode > 0:
+                    max_abs = float(np.max(np.abs(arr)))
+                    scale = max_abs / 127.0 if max_abs > 0 else 1.0
+                    zero_point = 0
+                    size_bytes = arr_info['num_elements'] * 1
+                else:
+                    scale = 1.0
+                    zero_point = 0
+                    size_bytes = arr_info['num_elements'] * 4
+                
+                scales_cache.append(scale)
+                
                 array_metadata_block.extend(struct.pack('<B', ndim))
                 for dim in shape:
                     array_metadata_block.extend(struct.pack('<I', dim))
                 array_metadata_block.extend(struct.pack('<I', arr_info['num_elements']))
-                array_metadata_block.extend(struct.pack('<I', arr_info['size_bytes']))
+                array_metadata_block.extend(struct.pack('<I', size_bytes))
+                array_metadata_block.extend(struct.pack('<f', scale))
+                array_metadata_block.extend(struct.pack('<b', zero_point))
+                array_metadata_block.extend(b'\x00' * 3)
+                arr_counter += 1
         
         f.write(array_metadata_block)
         sha256_hash.update(array_metadata_block)
 
         # Weight Data Chunking
-        for arr in weight_arrays:
-            flat_arr = arr.astype(np.float32).flatten()
-            chunk = flat_arr.tobytes()
+        for idx, arr in enumerate(weight_arrays):
+            if mode > 0:
+                scale = scales_cache[idx]
+                q_arr = np.clip(np.round(arr / scale), -128, 127).astype(np.int8)
+                chunk = q_arr.tobytes()
+            else:
+                flat_arr = arr.astype(np.float32).flatten()
+                chunk = flat_arr.tobytes()
             f.write(chunk)
             sha256_hash.update(chunk)
 
@@ -134,9 +160,10 @@ def save_weights_as_numpy(weight_arrays, weight_manifest, output_dir):
     global_counter = 0
     for manifest_entry in weight_manifest:
         layer_name = manifest_entry['layer_name']
+        layer_idx = manifest_entry['layer_index']
         for arr_info in manifest_entry['arrays']:
             arr_idx = arr_info['array_index']
-            key = f"{layer_name}_arr{arr_idx}"
+            key = f"layer_{layer_idx:03d}_{layer_name}_arr{arr_idx}"
             weight_dict[key] = weight_arrays[global_counter]
             global_counter += 1
 
@@ -154,7 +181,7 @@ def generate_weight_statistics(weight_arrays, weight_manifest):
         'total_size_float32_bytes': int(sum(np.prod(arr.shape, dtype=np.int64) * 4 for arr in weight_arrays)),
         'global_min': float(min(np.min(arr) for arr in weight_arrays)),
         'global_max': float(max(np.max(arr) for arr in weight_arrays)),
-        'global_mean': float(np.mean([np.mean(arr) for arr in weight_arrays])),
+        'global_mean': float(sum(np.sum(arr) for arr in weight_arrays) / sum(np.prod(arr.shape, dtype=np.int64) for arr in weight_arrays)),
         'per_layer_stats': []
     }
 
@@ -186,22 +213,25 @@ def generate_weight_statistics(weight_arrays, weight_manifest):
     return stats
 
 
-def export_weights(model_path=None):
+def export_weights(model_path=None, quant_mode='fp32'):
+    mode_map = {'fp32': 0, 'int8_weight': 1, 'int8_full': 2}
+    if quant_mode not in mode_map:
+        raise ValueError(f"HATA: Bilinmeyen quant_mode: {quant_mode}. Desteklenen modlar: {list(mode_map.keys())}")
+    mode_val = mode_map[quant_mode]
+
     base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'output')
     model_dir = os.path.join(base_dir, 'model')
     export_dir = os.path.join(base_dir, 'exported_weights')
     os.makedirs(export_dir, exist_ok=True)
 
     if model_path is None:
-        model_path = os.path.join(model_dir, 'cyberpuf_cifar10_model.h5')
+        model_path = os.path.join(model_dir, 'cyberpuf_cifar10_model.keras')
 
     if not os.path.exists(model_path):
-        print(f"HATA: Model dosyasi bulunamadi: {model_path}")
-        print("Lutfen once train_model.py betigini calistirin.")
-        sys.exit(1)
+        raise FileNotFoundError(f"HATA: Model dosyasi bulunamadi: {model_path}\nLutfen once train_model.py betigini calistirin.")
 
     print("=" * 70)
-    print("CyberPUF - Faz 1: Agirlik Disa Aktarma (Weight Export)")
+    print(f"CyberPUF - Faz 1: Agirlik Disa Aktarma (Mod: {quant_mode})")
     print("Gelistirici: Arda Mecik")
     print("=" * 70)
 
@@ -212,7 +242,10 @@ def export_weights(model_path=None):
     weight_arrays, weight_manifest, total_params = extract_all_weights(model)
     print(f"  Toplam agirlik dizisi : {len(weight_arrays)}")
     print(f"  Toplam parametre      : {total_params:,}")
-    print(f"  Toplam boyut (float32): {(total_params * 4) / (1024 * 1024):.2f} MB")
+    if mode_val > 0:
+        print(f"  Toplam boyut (int8)   : {(total_params * 1) / (1024 * 1024):.2f} MB")
+    else:
+        print(f"  Toplam boyut (float32): {(total_params * 4) / (1024 * 1024):.2f} MB")
 
     for entry in weight_manifest:
         print(f"  Katman: {entry['layer_name']:30s} | Tip: {entry['layer_type']:20s} | Dizi sayisi: {entry['arrays'].__len__()}")
@@ -221,7 +254,7 @@ def export_weights(model_path=None):
 
     print("\n[3/5] Agirliklar ikili (binary) formata serilestriliyor (streaming)...")
     binary_path = os.path.join(export_dir, 'cyberpuf_weights.bin')
-    sha256_hash = serialize_weights_to_binary(weight_arrays, weight_manifest, binary_path)
+    sha256_hash = serialize_weights_to_binary(weight_arrays, weight_manifest, binary_path, mode=mode_val)
     print(f"  SHA-256 ozeti        : {sha256_hash}")
     print(f"  Ikili dosya kaydedildi: {binary_path}")
 
@@ -266,9 +299,10 @@ def export_weights(model_path=None):
         'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'phase': 'Faz 1 - Weight Export',
+        'quant_mode': quant_mode,
         'total_arrays': len(weight_arrays),
         'total_parameters': int(total_params),
-        'total_size_bytes': int(total_params * 4),
+        'total_size_bytes': int(total_params * 1) if mode_val > 0 else int(total_params * 4),
         'binary_file': 'cyberpuf_weights.bin',
         'binary_sha256': sha256_hash,
         'manifest': manifest_serializable
@@ -289,8 +323,11 @@ def export_weights(model_path=None):
 
 if __name__ == '__main__':
     custom_model_path = None
+    custom_quant_mode = 'fp32'
 
     if len(sys.argv) > 1:
         custom_model_path = sys.argv[1]
+    if len(sys.argv) > 2:
+        custom_quant_mode = sys.argv[2]
 
-    export_weights(model_path=custom_model_path)
+    export_weights(model_path=custom_model_path, quant_mode=custom_quant_mode)

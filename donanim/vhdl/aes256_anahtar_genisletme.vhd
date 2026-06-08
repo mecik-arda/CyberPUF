@@ -17,7 +17,7 @@ end entity aes256_anahtar_genisletme;
 
 architecture rtl of aes256_anahtar_genisletme is
 
-    type state_t is (IDLE, LOAD_KEY, EXPAND, FINISHED);
+    type state_t is (IDLE, LOAD_KEY, EXPAND, FINISHED, DONE_PULSE);
     signal state : state_t;
 
     signal w : kelime_dizisi_t(0 to 59);
@@ -89,6 +89,9 @@ begin
                     for rk in 0 to 14 loop
                         tur_anahtarlari(rk) <= w(rk * 4) & w(rk * 4 + 1) & w(rk * 4 + 2) & w(rk * 4 + 3);
                     end loop;
+                    state <= DONE_PULSE;
+
+                when DONE_PULSE =>
                     done <= '1';
                     busy <= '0';
                     state <= IDLE;

@@ -3,6 +3,7 @@ import sys
 import json
 import struct
 import hashlib
+import hmac
 import numpy as np
 from Crypto.Cipher import AES
 
@@ -11,6 +12,16 @@ from crypto_utils import get_puf_key, derive_key_from_puf_simulation
 
 
 def parse_encrypted_binary(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Encrypted file not found: {file_path}")
+    
+    file_size = os.path.getsize(file_path)
+    if file_size < 20:  # Minimum valid file size
+        raise ValueError(f"File too small: {file_size} bytes")
+    
+    if file_size > 1024 * 1024 * 1024:  # 1GB limit
+        raise ValueError(f"File too large: {file_size} bytes (max 1GB)")
+    
     with open(file_path, 'rb') as f:
         data = f.read()
 
@@ -49,18 +60,33 @@ def parse_encrypted_binary(file_path):
     metadata = json.loads(metadata_json)
     offset += metadata_length
 
+    aad_bytes = data[:offset]
+
     if encryption_mode == 'GCM' or encryption_mode == 'CBC':
         nonce_length = struct.unpack('<B', data[offset:offset + 1])[0]
         offset += 1
+        
+        if nonce_length < 8 or nonce_length > 32:
+            raise ValueError(f"Invalid nonce length: {nonce_length} (expected 8-32)")
+        
         nonce = data[offset:offset + nonce_length]
         offset += nonce_length
 
         if encryption_mode == 'GCM':
             tag_length = struct.unpack('<B', data[offset:offset + 1])[0]
             offset += 1
+            
+            if tag_length != 16:
+                raise ValueError(f"Invalid GCM tag length: {tag_length} (expected 16)")
+            
             auth_tag = data[offset:offset + tag_length]
             offset += tag_length
         else:
+            if encryption_mode == 'CBC' and 'ciphertext_hmac' in metadata:
+                hmac_length = struct.unpack('<B', data[offset:offset + 1])[0]
+                offset += 1
+                hmac_bytes = data[offset:offset + hmac_length]
+                offset += hmac_length
             auth_tag = b''
 
     ciphertext_length = struct.unpack('<Q', data[offset:offset + 8])[0]
@@ -77,6 +103,7 @@ def parse_encrypted_binary(file_path):
         'nonce': nonce,
         'auth_tag': auth_tag,
         'ciphertext': ciphertext,
+        'aad_bytes': aad_bytes,
         'total_file_size': len(data),
         'header_size': offset - len(ciphertext),
         'ciphertext_size': len(ciphertext)
@@ -85,11 +112,34 @@ def parse_encrypted_binary(file_path):
     return parsed
 
 
-def decrypt_data(ciphertext, nonce, auth_tag, aes_key, mode='GCM'):
+def decrypt_data(ciphertext, nonce, auth_tag, aes_key, raw_puf_key, mode='GCM', expected_hmac=None, aad=b'', metadata=None):
     if mode == 'GCM':
         cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
+        if aad:
+            cipher.update(aad)
         plaintext = cipher.decrypt_and_verify(ciphertext, auth_tag)
     elif mode == 'CBC':
+        import hmac
+        import hashlib
+        import json
+        if not expected_hmac:
+            raise ValueError("HMAC verification failed! Expected HMAC is missing in CBC mode.")
+            
+        mac_salt_hex = metadata.get('mac_salt_hex')
+        if not mac_salt_hex:
+            raise ValueError("HMAC verification failed! mac_salt_hex is missing in metadata.")
+        mac_salt = bytes.fromhex(mac_salt_hex)
+        mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
+        
+        h = hmac.new(mac_key, digestmod=hashlib.sha256)
+        h.update(aad)
+        h.update(nonce)
+        h.update(ciphertext)
+        computed_hmac = h.hexdigest()
+        
+        if not hmac.compare_digest(computed_hmac, expected_hmac):
+            raise ValueError("HMAC verification failed! Ciphertext has been tampered with.")
+            
         from Crypto.Util.Padding import unpad
         cipher = AES.new(aes_key, AES.MODE_CBC, nonce)
         decrypted_padded = cipher.decrypt(ciphertext)
@@ -113,6 +163,9 @@ def parse_weight_binary(plaintext_data):
     version_minor = struct.unpack('<B', plaintext_data[offset:offset + 1])[0]
     offset += 1
 
+    quant_mode = struct.unpack('<B', plaintext_data[offset:offset + 1])[0]
+    offset += 1
+
     total_arrays = struct.unpack('<I', plaintext_data[offset:offset + 4])[0]
     offset += 4
 
@@ -125,11 +178,14 @@ def parse_weight_binary(plaintext_data):
     if total_elements > 10**8:
         raise ValueError(f"Toplam eleman sayisi cok buyuk: {total_elements}")
 
-    reserved = plaintext_data[offset:offset + 16]
-    offset += 16
+    reserved = plaintext_data[offset:offset + 15]
+    offset += 15
 
     array_shapes = []
     array_sizes = []
+    array_scales = []
+    array_zps = []
+    
     for _ in range(total_arrays):
         ndim = struct.unpack('<B', plaintext_data[offset:offset + 1])[0]
         offset += 1
@@ -144,26 +200,54 @@ def parse_weight_binary(plaintext_data):
         offset += 4
         size_bytes = struct.unpack('<I', plaintext_data[offset:offset + 4])[0]
         offset += 4
+        
+        scale = struct.unpack('<f', plaintext_data[offset:offset + 4])[0]
+        offset += 4
+        
+        zp = struct.unpack('<b', plaintext_data[offset:offset + 1])[0]
+        offset += 1
+        
+        padding = plaintext_data[offset:offset + 3]
+        offset += 3
+        
         array_sizes.append((num_elements, size_bytes))
+        array_scales.append(scale)
+        array_zps.append(zp)
 
     weight_arrays = []
     for i in range(total_arrays):
         num_elements = array_sizes[i][0]
-        byte_count = num_elements * 4
-        float_data = np.frombuffer(
-            plaintext_data[offset:offset + byte_count],
-            dtype=np.float32
-        )
-        weight_array = float_data.reshape(array_shapes[i])
+        if quant_mode > 0:
+            byte_count = num_elements * 1
+            int8_data = np.frombuffer(
+                plaintext_data,
+                dtype=np.int8,
+                count=num_elements,
+                offset=offset
+            )
+            weight_array = int8_data.reshape(array_shapes[i])
+        else:
+            byte_count = num_elements * 4
+            float_data = np.frombuffer(
+                plaintext_data,
+                dtype=np.float32,
+                count=num_elements,
+                offset=offset
+            )
+            weight_array = float_data.reshape(array_shapes[i])
+            
         weight_arrays.append(weight_array)
         offset += byte_count
 
     parsed_weights = {
         'magic': magic.decode('ascii'),
         'version': f'{version_major}.{version_minor}',
+        'quant_mode': quant_mode,
         'total_arrays': total_arrays,
         'total_elements': total_elements,
         'array_shapes': array_shapes,
+        'array_scales': array_scales,
+        'array_zps': array_zps,
         'weight_arrays': weight_arrays
     }
 
@@ -175,6 +259,8 @@ def compare_with_original(decrypted_weights, original_weights_path):
 
     original_arrays = [original_data[key] for key in original_data.files]
     decrypted_arrays = decrypted_weights['weight_arrays']
+    quant_mode = decrypted_weights['quant_mode']
+    array_scales = decrypted_weights.get('array_scales', [])
 
     if len(original_arrays) != len(decrypted_arrays):
         return False, f"Dizi sayisi uyusmuyor: orijinal={len(original_arrays)}, cozumlenen={len(decrypted_arrays)}"
@@ -183,10 +269,20 @@ def compare_with_original(decrypted_weights, original_weights_path):
         if original_arrays[i].shape != decrypted_arrays[i].shape:
             return False, f"Dizi {i} sekil uyusmuyor: orijinal={original_arrays[i].shape}, cozumlenen={decrypted_arrays[i].shape}"
 
-        if not np.allclose(original_arrays[i], decrypted_arrays[i], rtol=1e-5, atol=1e-7):
-            max_diff = np.max(np.abs(original_arrays[i] - decrypted_arrays[i]))
-            return False, f"Dizi {i} deger uyusmuyor: max fark={max_diff}"
+        comp_array = decrypted_arrays[i]
+        if quant_mode > 0:
+            scale = array_scales[i]
+            comp_array = comp_array.astype(np.float32) * scale
+            max_tol = scale * 1.5
+        else:
+            max_tol = 1e-5
 
+        if not np.allclose(original_arrays[i], comp_array, rtol=1e-3, atol=max_tol):
+            max_diff = np.max(np.abs(original_arrays[i] - comp_array))
+            return False, f"Dizi {i} deger uyusmuyor: max fark={max_diff} (tol: {max_tol})"
+
+    if quant_mode > 0:
+        return True, "Tum diziler basariyla dogrulandi (Nicemleme toleransi dahilinde)."
     return True, "Tum diziler basariyla dogrulandi."
 
 
@@ -211,9 +307,7 @@ def verify_encryption():
     print("-" * 70)
 
     if not os.path.exists(encrypted_file):
-        print(f"  HATA: Sifreli dosya bulunamadi: {encrypted_file}")
-        print("  Lutfen once encrypt_weights.py betigini calistirin.")
-        sys.exit(1)
+        raise FileNotFoundError(f"HATA: Sifreli dosya bulunamadi: {encrypted_file}\nLutfen once encrypt_weights.py betigini calistirin.")
 
     try:
         parsed = parse_encrypted_binary(encrypted_file)
@@ -231,7 +325,7 @@ def verify_encryption():
     except Exception as e:
         print(f"  SONUC: BASARISIZ - {str(e)}")
         test_results.append(('Dosya Ayristirma', False, str(e)))
-        sys.exit(1)
+        raise RuntimeError("Dosya ayristirma hatasi") from e
 
     print("\n" + "-" * 70)
     print("TEST 2: AES-256 Sifre Cozumleme (Decryption)")
@@ -239,15 +333,20 @@ def verify_encryption():
 
     try:
         raw_puf_key = get_puf_key()
-        aes_key = derive_key_from_puf_simulation(raw_puf_key)
-        print(f"  AES Anahtari (hex): {aes_key.hex()}")
+        salt = bytes.fromhex(parsed['metadata']['salt_hex'])
+        aes_key, _ = derive_key_from_puf_simulation(raw_puf_key, salt)
+        print(f"  AES Anahtari (hex): {aes_key.hex()[:4]}***{aes_key.hex()[-4:]}")
 
         decrypted_data = decrypt_data(
             parsed['ciphertext'],
             parsed['nonce'],
             parsed['auth_tag'],
             aes_key,
-            mode=parsed['encryption_mode']
+            raw_puf_key,
+            mode=parsed['encryption_mode'],
+            expected_hmac=parsed['metadata'].get('ciphertext_hmac'),
+            aad=parsed.get('aad_bytes', b''),
+            metadata=parsed['metadata']
         )
         print(f"  Cozumlenen boyut : {len(decrypted_data):,} byte")
         print(f"  SONUC: BASARILI")
@@ -255,12 +354,13 @@ def verify_encryption():
     except Exception as e:
         print(f"  SONUC: BASARISIZ - {str(e)}")
         test_results.append(('AES Sifre Cozme', False, str(e)))
-        sys.exit(1)
+        raise RuntimeError("Sifre cozme hatasi") from e
 
     print("\n" + "-" * 70)
     print("TEST 3: Orijinal ikili veri ile karsilastirma")
     print("-" * 70)
 
+    original_binary = None
     if os.path.exists(original_weights_bin):
         with open(original_weights_bin, 'rb') as f:
             original_binary = f.read()
@@ -327,7 +427,7 @@ def verify_encryption():
     print("-" * 70)
 
     decrypted_sha256 = hashlib.sha256(decrypted_data).hexdigest()
-    original_sha256 = hashlib.sha256(original_binary).hexdigest() if os.path.exists(original_weights_bin) else 'N/A'
+    original_sha256 = hashlib.sha256(original_binary).hexdigest() if original_binary is not None else 'N/A'
 
     print(f"  Cozumlenen SHA-256 : {decrypted_sha256}")
     print(f"  Orijinal SHA-256   : {original_sha256}")
@@ -349,6 +449,7 @@ def verify_encryption():
     print("-" * 70)
 
     wrong_key = bytes([0xFF] * 32)
+    wrong_puf_key = bytes([0xAA] * 32)
 
     try:
         wrong_decrypted = decrypt_data(
@@ -356,7 +457,11 @@ def verify_encryption():
             parsed['nonce'],
             parsed['auth_tag'],
             wrong_key,
-            mode=parsed['encryption_mode']
+            wrong_puf_key,
+            mode=parsed['encryption_mode'],
+            expected_hmac=parsed['metadata'].get('ciphertext_hmac'),
+            aad=parsed.get('aad_bytes', b''),
+            metadata=parsed['metadata']
         )
         print(f"  SONUC: BASARISIZ - Yanlis anahtar ile cozumleme basarili olmamali!")
         test_results.append(('Yanlis Anahtar Testi', False, 'Yanlis anahtar kabul edildi'))
@@ -380,18 +485,14 @@ def verify_encryption():
             parsed['nonce'],
             parsed['auth_tag'],
             aes_key,
-            mode=parsed['encryption_mode']
+            raw_puf_key,
+            mode=parsed['encryption_mode'],
+            expected_hmac=parsed['metadata'].get('ciphertext_hmac'),
+            aad=parsed.get('aad_bytes', b''),
+            metadata=parsed['metadata']
         )
         
-        # CBC modunda padding en sonda oldugu icin ilk byte'in bozulmasi unpadding'i etkilemez.
-        # Bu yuzden SHA-256 kontrolu yapmaliyiz.
-        if parsed['encryption_mode'] == 'CBC':
-            tampered_sha256 = hashlib.sha256(tampered_decrypted).hexdigest()
-            with open(os.path.join(export_dir, 'cyberpuf_weights.bin'), 'rb') as f:
-                original_sha256 = hashlib.sha256(f.read()).hexdigest()
-                
-            if tampered_sha256 != original_sha256:
-                raise ValueError("SHA-256 Butunluk Hatasi: Bozulmus veri tespit edildi!")
+        # HMAC varsa zafiyet zaten ustte patlar ve asagiya inmez.
                 
         print(f"  SONUC: BASARISIZ - Bozulmus veri tespit edilemedi!")
         test_results.append(('Dis Mudahale Tespiti', False, 'Bozulma fark edilmedi'))

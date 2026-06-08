@@ -9,7 +9,7 @@ entity puf_anahtar_ureteci is
         INVERTER_SAYISI    : integer := 3;
         SAYICI_GENISLIGI    : integer := 20;
         SAYMA_DONGULERI     : integer := 1000;
-        REPETITIONS      : integer := 16
+        REPETITIONS      : integer := 15
     );
     port (
         clk             : in  std_logic;
@@ -53,7 +53,7 @@ architecture rtl of puf_anahtar_ureteci is
 
     component ro_puf_cekirdek is
         generic (
-            RO_CIFT_SAYISI     : integer := 16;
+            RO_CIFT_SAYISI     : integer := 256;
             INVERTER_SAYISI    : integer := 3;
             SAYICI_GENISLIGI    : integer := 20;
             SAYMA_DONGULERI     : integer := 1000

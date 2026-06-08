@@ -4,6 +4,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef enum {
+    CPUF_MODE_FP32 = 0x00,
+    CPUF_MODE_INT8_WEIGHT = 0x01,
+    CPUF_MODE_INT8_FULL = 0x02
+} CPUF_QuantizationMode_t;
+
+extern CPUF_QuantizationMode_t g_aktif_model_modu;
+
 typedef struct {
     float* w;
     float* b;
@@ -42,6 +50,6 @@ void Dense_Final_Softmax(const float* giris, float* cikis, const DenseFinalParam
 
 void CyberPUF_CNN_Calistir(const float* giris_goruntusu, float* ham_agirliklar, uint32_t agirlik_kapasitesi, float* cikis_olasiliklari);
 
-float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut);
+float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut, uint32_t* cikan_boyut);
 
 #endif

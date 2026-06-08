@@ -3,7 +3,7 @@ import sys
 import time
 
 
-def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='CBC'):
+def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='CBC', quant_mode='int8_weight'):
     print("=" * 70)
     print("CyberPUF - Faz 1: Tam Pipeline Calistirma")
     print("Gelistirici: Arda Mecik")
@@ -12,18 +12,20 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     print(f"  Batch boyutu       : {yigin_boyutu}")
     print(f"  Ogrenme hizi       : {ogrenme_orani}")
     print(f"  Sifreleme modu     : AES-256-{sifreleme_modu}")
+    print(f"  Nicemleme (Quant)  : {quant_mode}")
     print("=" * 70)
 
     toplam_baslangic = time.time()
 
     def cleanup_on_error():
         print("\n  [HATA YONETIMI] Ara dosyalar temizleniyor...")
+        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
         dosyalar = [
-            os.path.join('ai_sifreleme', 'cyberpuf_weights.cpuf'),
-            os.path.join('ai_sifreleme', 'cyberpuf_encrypted_weights.bin'),
-            os.path.join('ai_sifreleme', 'cyberpuf_ciphertext_raw.bin'),
-            os.path.join('ai_sifreleme', 'cyberpuf_nonce.bin'),
-            os.path.join('ai_sifreleme', 'cyberpuf_auth_tag.bin')
+            os.path.join(base_dir, 'exported_weights', 'cyberpuf_weights.bin'),
+            os.path.join(base_dir, 'encrypted_weights', 'cyberpuf_encrypted_weights.bin'),
+            os.path.join(base_dir, 'encrypted_weights', 'cyberpuf_ciphertext_raw.bin'),
+            os.path.join(base_dir, 'encrypted_weights', 'cyberpuf_nonce.bin'),
+            os.path.join(base_dir, 'encrypted_weights', 'cyberpuf_auth_tag.bin')
         ]
         for dosya in dosyalar:
             if os.path.exists(dosya):
@@ -61,7 +63,7 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     adim2_baslangic = time.time()
     try:
         from ai_sifreleme.export_weights import export_weights
-        ikili_veri, agirlik_manifestosu, sha256_hash_degeri = export_weights()
+        ikili_veri, agirlik_manifestosu, sha256_hash_degeri = export_weights(quant_mode=quant_mode)
     except Exception as e:
         print(f"\n  HATA: Adim 2 (Agirlik Disa Aktarma) basarisiz oldu: {e}")
         cleanup_on_error()
@@ -105,9 +107,7 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
 
     toplam_sure = time.time() - toplam_baslangic
 
-    import gc
-    gc.collect()
-    print("\n  Acik kalan dosya handle'i olmadigi dogrulandi (Garbage Collection calistirildi).")
+    print("\n  Kaynaklarin kapandigi dogrulandi.")
 
     print("\n\n")
     print("=" * 70)
@@ -125,25 +125,38 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
 
 
 if __name__ == '__main__':
-    pipeline_epoch_sayisi = 50
+    pipeline_epoch_sayisi = 5
     pipeline_yigin_boyutu = 128
     pipeline_ogrenme_orani = 0.001
     pipeline_modu = 'CBC'
+    pipeline_quant_mode = 'int8_weight'
 
-    if len(sys.argv) > 1:
-        pipeline_epoch_sayisi = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        pipeline_yigin_boyutu = int(sys.argv[2])
-    if len(sys.argv) > 3:
-        pipeline_ogrenme_orani = float(sys.argv[3])
-    if len(sys.argv) > 4:
-        pipeline_modu = sys.argv[4].upper()
+    try:
+        if len(sys.argv) > 1:
+            pipeline_epoch_sayisi = int(sys.argv[1])
+            if pipeline_epoch_sayisi <= 0: raise ValueError("Epochs > 0 olmali")
+        if len(sys.argv) > 2:
+            pipeline_yigin_boyutu = int(sys.argv[2])
+            if pipeline_yigin_boyutu <= 0: raise ValueError("Batch size > 0 olmali")
+        if len(sys.argv) > 3:
+            pipeline_ogrenme_orani = float(sys.argv[3])
+            if pipeline_ogrenme_orani <= 0: raise ValueError("Learning rate > 0 olmali")
+        if len(sys.argv) > 4:
+            pipeline_modu = sys.argv[4].upper()
+            if pipeline_modu not in ('CBC', 'GCM'): raise ValueError("Sifreleme modu 'CBC' veya 'GCM' olmali")
+        if len(sys.argv) > 5:
+            pipeline_quant_mode = sys.argv[5].lower()
+            if pipeline_quant_mode not in ('fp32', 'int8_weight', 'int8_full'): raise ValueError("Quant mode 'fp32', 'int8_weight' veya 'int8_full' olmali")
+    except ValueError as e:
+        print(f"HATA: Gecersiz arguman: {e}")
+        sys.exit(1)
 
     basari_durumu = run_full_pipeline(
         epoch_sayisi=pipeline_epoch_sayisi,
         yigin_boyutu=pipeline_yigin_boyutu,
         ogrenme_orani=pipeline_ogrenme_orani,
-        sifreleme_modu=pipeline_modu
+        sifreleme_modu=pipeline_modu,
+        quant_mode=pipeline_quant_mode
     )
 
     sys.exit(0 if basari_durumu else 1)

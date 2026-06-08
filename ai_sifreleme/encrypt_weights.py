@@ -6,6 +6,7 @@ import hashlib
 import secrets
 import datetime
 import numpy as np
+import hmac
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
@@ -17,6 +18,15 @@ ENCRYPTED_FILE_MAGIC = b'CPFE'
 ENCRYPTED_VERSION_MAJOR = 1
 ENCRYPTED_VERSION_MINOR = 0
 
+def encrypt_aes256_gcm(plaintext_data, aes_key, aad=b''):
+    if len(aes_key) != 32:
+        raise ValueError("AES anahtari 32 byte (256-bit) olmalidir.")
+    nonce = secrets.token_bytes(12)  # GCM için önerilen nonce boyutu 12 byte
+    cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
+    if aad:
+        cipher.update(aad)
+    ciphertext, auth_tag = cipher.encrypt_and_digest(plaintext_data)
+    return ciphertext, nonce, auth_tag
 
 def encrypt_aes256_cbc(plaintext_data, aes_key):
     if len(aes_key) != 32:
@@ -49,9 +59,12 @@ def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
 
     output.extend(struct.pack('<B', 0x00))
 
-    metadata_json = json.dumps(metadata).encode('utf-8')
-    output.extend(struct.pack('<I', len(metadata_json)))
-    output.extend(metadata_json)
+    if metadata:
+        metadata_json = json.dumps(metadata).encode('utf-8')
+        output.extend(struct.pack('<I', len(metadata_json)))
+        output.extend(metadata_json)
+    else:
+        output.extend(struct.pack('<I', 0))
 
     if mode == 'GCM' or mode == 'CBC':
         output.extend(struct.pack('<B', len(nonce)))
@@ -59,6 +72,10 @@ def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
         if mode == 'GCM':
             output.extend(struct.pack('<B', len(auth_tag)))
             output.extend(auth_tag)
+        elif mode == 'CBC' and 'ciphertext_hmac' in metadata:
+            hmac_bytes = bytes.fromhex(metadata['ciphertext_hmac'])
+            output.extend(struct.pack('<B', len(hmac_bytes)))
+            output.extend(hmac_bytes)
 
     output.extend(struct.pack('<Q', len(ciphertext)))
     output.extend(ciphertext)
@@ -173,9 +190,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
         weight_binary_path = os.path.join(export_dir, 'cyberpuf_weights.bin')
 
     if not os.path.exists(weight_binary_path):
-        print(f"HATA: Agirlik dosyasi bulunamadi: {weight_binary_path}")
-        print("Lutfen once export_weights.py betigini calistirin.")
-        sys.exit(1)
+        raise FileNotFoundError(f"HATA: Agirlik dosyasi bulunamadi: {weight_binary_path}\nLutfen once export_weights.py betigini calistirin.")
 
     print("=" * 70)
     print("CyberPUF - Faz 1: AES-256 Agirlik Sifreleme")
@@ -193,45 +208,88 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
 
     print("\n[2/7] PUF simule edilen AES-256 anahtari hazirlaniyor...")
     raw_puf_key = get_puf_key()
-    aes_key = derive_key_from_puf_simulation(raw_puf_key)
+    aes_key, salt = derive_key_from_puf_simulation(raw_puf_key)
     print(f"  Anahtar uzunlugu : {len(aes_key) * 8} bit")
-    print(f"  Anahtar (hex)    : {aes_key.hex()}")
+    print(f"  Anahtar (hex)    : {aes_key.hex()[:4]}***{aes_key.hex()[-4:]}")
     print(f"  Not: Bu anahtar ortam degiskeninden (veya fallback) alindi.")
 
-    key_info_path = os.path.join(encrypt_dir, 'puf_simulated_key.json')
-    key_info = {
+
+    encryption_metadata = {
         'project': 'CyberPUF',
         'developer': 'Arda Mecik',
-        'description': 'PUF simulated AES-256 key (to be replaced by hardware PUF in Phase 2)',
-        'raw_key_hex': raw_puf_key.hex(),
-        'derived_key_hex': aes_key.hex(),
-        'key_length_bits': len(aes_key) * 8,
-        'derivation_method': 'SHA-256',
-        'timestamp': datetime.datetime.now().isoformat()
+        'encryption_mode': f'AES-256-{encryption_mode}',
+        'plaintext_size': len(plaintext_data),
+        'ciphertext_size': None,
+        'plaintext_sha256': plaintext_sha256,
+        'salt_hex': salt.hex(),
+        'timestamp': datetime.datetime.now().isoformat(),
+        'key_source': 'PUF_SIMULATED_STATIC'
     }
-    with open(key_info_path, 'w') as f:
-        json.dump(key_info, f, indent=2)
-    print(f"  Anahtar bilgisi kaydedildi: {key_info_path}")
+
+    mac_salt = secrets.token_bytes(16)
+    encryption_metadata['mac_salt_hex'] = mac_salt.hex()
+
+    if encryption_mode == 'GCM':
+        expected_ciphertext_size = len(plaintext_data)
+    elif encryption_mode == 'CBC':
+        expected_ciphertext_size = len(plaintext_data) + (AES.block_size - len(plaintext_data) % AES.block_size)
+    else:
+        raise ValueError("Desteklenmeyen mod.")
+    
+    encryption_metadata['ciphertext_size'] = expected_ciphertext_size
 
     print(f"\n[3/7] AES-256-{encryption_mode} ile sifreleme gerceklestiriliyor...")
 
+    aad_output = bytearray()
+    aad_output.extend(ENCRYPTED_FILE_MAGIC)
+    aad_output.extend(struct.pack('<B', ENCRYPTED_VERSION_MAJOR))
+    aad_output.extend(struct.pack('<B', ENCRYPTED_VERSION_MINOR))
+    aad_output.extend(struct.pack('<B', 0x01 if encryption_mode == 'GCM' else 0x02))
+    aad_output.extend(struct.pack('<B', 0x00))
+    
+    temp_metadata = encryption_metadata.copy()
+    if 'ciphertext_hmac' in temp_metadata:
+        del temp_metadata['ciphertext_hmac']
+    metadata_json = json.dumps(temp_metadata).encode('utf-8')
+    
+    aad_output.extend(struct.pack('<I', len(metadata_json)))
+    aad_output.extend(metadata_json)
+    aad_bytes = bytes(aad_output)
+
     if encryption_mode == 'GCM':
-        ciphertext, nonce, auth_tag = encrypt_aes256_gcm(plaintext_data, aes_key)
+        ciphertext, nonce, auth_tag = encrypt_aes256_gcm(plaintext_data, aes_key, aad=aad_bytes)
     elif encryption_mode == 'CBC':
         ciphertext, nonce, auth_tag = encrypt_aes256_cbc(plaintext_data, aes_key)
     else:
         raise ValueError("Desteklenmeyen mod.")
+
+    # Update metadata with ciphertext info if needed (for CBC HMAC)
+    ciphertext_sha256 = hashlib.sha256(ciphertext).hexdigest()
+    encryption_metadata['ciphertext_size'] = len(ciphertext)
+    
+    # Key separation: Derive a separate key for MAC
+    mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
+    
+    # Encrypt-then-MAC
+    h = hmac.new(mac_key, digestmod=hashlib.sha256)
+    h.update(aad_bytes)
+    h.update(nonce)
+    h.update(ciphertext)
+    ciphertext_hmac = h.hexdigest()
+    
+    if encryption_mode == 'CBC':
+        encryption_metadata['ciphertext_hmac'] = ciphertext_hmac
         
     print(f"  Sifreli veri boyutu  : {len(ciphertext):,} byte")
     print(f"  IV/Nonce (hex)       : {nonce.hex()}")
-
-    ciphertext_sha256 = hashlib.sha256(ciphertext).hexdigest()
     print(f"  Sifreleme SHA-256    : {ciphertext_sha256}")
+    print(f"  Sifreli Veri HMAC    : {ciphertext_hmac}")
 
     print("\n[4/7] Dogrulama: Sifreli veriyi cozumleme (decrypt) testi...")
 
     if encryption_mode == 'GCM':
         verify_cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
+        verify_cipher.update(aad_bytes)
         decrypted_data = verify_cipher.decrypt_and_verify(ciphertext, auth_tag)
     elif encryption_mode == 'CBC':
         from Crypto.Util.Padding import unpad
@@ -244,22 +302,9 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
         print(f"  Orijinal boyut   : {len(plaintext_data):,} byte")
         print(f"  Cozumlenen boyut : {len(decrypted_data):,} byte")
     else:
-        print(f"  HATA: Cozumlenen veri orijinal veriyle ESLESMEZ!")
-        sys.exit(1)
+        raise Exception("HATA: Cozumlenen veri orijinal veriyle ESLESMEZ!")
 
     print("\n[5/7] Sifreli ikili (binary) dosya olusturuluyor...")
-
-    encryption_metadata = {
-        'project': 'CyberPUF',
-        'developer': 'Arda Mecik',
-        'encryption_mode': f'AES-256-{encryption_mode}',
-        'plaintext_size': len(plaintext_data),
-        'ciphertext_size': len(ciphertext),
-        'plaintext_sha256': plaintext_sha256,
-        'ciphertext_sha256': ciphertext_sha256,
-        'timestamp': datetime.datetime.now().isoformat(),
-        'key_source': 'PUF_SIMULATED_STATIC'
-    }
 
     encrypted_binary = build_encrypted_binary(
         ciphertext, nonce, auth_tag, encryption_metadata, mode=encryption_mode
@@ -362,8 +407,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
             'nonce_file': nonce_path,
             'c_header_single': single_header_path if len(encrypted_binary) <= 1024 * 1024 else 'N/A (too large)',
             'c_header_chunked_dir': chunked_dir,
-            'c_header_nonce': nonce_header_path,
-            'key_info': key_info_path
+            'c_header_nonce': nonce_header_path
         },
         'verification': {
             'decrypt_test': 'PASSED',
@@ -403,9 +447,7 @@ if __name__ == '__main__':
         custom_mode = sys.argv[2].upper()
 
     if custom_mode not in ('GCM', 'CBC'):
-        print(f"HATA: Gecersiz sifreleme modu: {custom_mode}")
-        print("Desteklenen modlar: GCM, CBC")
-        sys.exit(1)
+        raise ValueError(f"HATA: Gecersiz sifreleme modu: {custom_mode}. Desteklenen modlar: GCM, CBC")
 
     encrypt_weights(
         weight_binary_path=custom_weight_path,

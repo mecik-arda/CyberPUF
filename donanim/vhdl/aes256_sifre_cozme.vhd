@@ -21,25 +21,24 @@ architecture rtl of aes256_sifre_cozme is
     type state_t is (
         IDLE,
         INIT_ADD_KEY,
-        INV_SHIFT_ROWS,
-        INV_SUB_BYTES,
-        INV_ADD_KEY,
+        INV_SHIFT_SUB_ADD,
+        STALL_STATE,
         INV_MIX_COLUMNS,
-        RANDOM_STALL,
         FINISHED
     );
     signal fsm_state : state_t;
 
     signal aes_state : durum_dizisi_t;
     signal round_num : unsigned(3 downto 0);
+    signal col_idx   : unsigned(1 downto 0);
 
     -- SCA Countermeasures (Side-Channel Attack)
-    signal lfsr_reg : std_logic_vector(15 downto 0) := x"ACE1";
+    signal lfsr_reg : std_logic_vector(31 downto 0) := x"ACE10001";
     signal noise_reg : std_logic_vector(31 downto 0) := (others => '0');
     attribute keep : string;
     attribute keep of noise_reg : signal is "true";
     signal stall_count : unsigned(1 downto 0) := "00";
-    signal free_running_counter : unsigned(15 downto 0) := x"1337";
+    signal free_running_counter : unsigned(31 downto 0) := x"1337BEEF";
 
 begin
 
@@ -66,13 +65,11 @@ begin
         elsif rising_edge(clk) then
             free_running_counter <= free_running_counter + 1;
 
-            -- LFSR (16-bit Galois, taps: 16,14,13,11)
-            lfsr_reg <= lfsr_reg(14 downto 0) & (lfsr_reg(15) xor lfsr_reg(13) xor lfsr_reg(12) xor lfsr_reg(10));
+            -- LFSR (32-bit Galois, taps: 32, 22, 2, 1) -> Indices 31, 21, 1, 0
+            lfsr_reg <= lfsr_reg(30 downto 0) & (lfsr_reg(31) xor lfsr_reg(21) xor lfsr_reg(1) xor lfsr_reg(0));
 
             -- Dummy Power Noise (tek atama ile birlestirildi)
-            noise_reg(31 downto 16) <= noise_reg(30 downto 16) & lfsr_reg(15);
-            noise_reg(15 downto 8)  <= noise_reg(14 downto 8) & lfsr_reg(0);
-            noise_reg(7 downto 0)   <= noise_reg(7 downto 0) xor lfsr_reg(7 downto 0);
+            noise_reg <= noise_reg(30 downto 0) & lfsr_reg(31);
 
             done <= '0';
 
@@ -85,8 +82,8 @@ begin
                         busy <= '1';
                         
                         -- LFSR seed'ini dinamik serbest sayacla baslat
-                        if free_running_counter = x"0000" then
-                            lfsr_reg <= x"ACE1";
+                        if free_running_counter = x"00000000" then
+                            lfsr_reg <= x"ACE10001";
                         else
                             lfsr_reg <= std_logic_vector(free_running_counter);
                         end if;
@@ -103,58 +100,49 @@ begin
                         end loop;
                     end loop;
                     round_num <= to_unsigned(13, 4);
-                    fsm_state <= INV_SHIFT_ROWS;
+                    
+                    stall_count <= unsigned(lfsr_reg(1 downto 0));
+                    fsm_state <= STALL_STATE;
 
-                when INV_SHIFT_ROWS =>
-                    temp_state := aes_state;
-
-                    aes_state(1, 0) <= temp_state(1, 3);
-                    aes_state(1, 1) <= temp_state(1, 0);
-                    aes_state(1, 2) <= temp_state(1, 1);
-                    aes_state(1, 3) <= temp_state(1, 2);
-
-                    aes_state(2, 0) <= temp_state(2, 2);
-                    aes_state(2, 1) <= temp_state(2, 3);
-                    aes_state(2, 2) <= temp_state(2, 0);
-                    aes_state(2, 3) <= temp_state(2, 1);
-
-                    aes_state(3, 0) <= temp_state(3, 1);
-                    aes_state(3, 1) <= temp_state(3, 2);
-                    aes_state(3, 2) <= temp_state(3, 3);
-                    aes_state(3, 3) <= temp_state(3, 0);
-
-                    fsm_state <= INV_SUB_BYTES;
-
-                when INV_SUB_BYTES =>
-                    for r in 0 to 3 loop
-                        for c in 0 to 3 loop
-                            aes_state(r, c) <= ters_bayt_degistir(aes_state(r, c));
-                        end loop;
-                    end loop;
-                    fsm_state <= INV_ADD_KEY;
-
-                when INV_ADD_KEY =>
+                when INV_SHIFT_SUB_ADD =>
                     rk_vec := tur_anahtarlari(to_integer(round_num));
                     rk_state := vektorden_duruma(rk_vec);
-                    for r in 0 to 3 loop
-                        for c in 0 to 3 loop
-                            aes_state(r, c) <= aes_state(r, c) xor rk_state(r, c);
-                        end loop;
-                    end loop;
+
+                    -- Row 0
+                    aes_state(0, 0) <= ters_bayt_degistir(aes_state(0, 0)) xor rk_state(0, 0);
+                    aes_state(0, 1) <= ters_bayt_degistir(aes_state(0, 1)) xor rk_state(0, 1);
+                    aes_state(0, 2) <= ters_bayt_degistir(aes_state(0, 2)) xor rk_state(0, 2);
+                    aes_state(0, 3) <= ters_bayt_degistir(aes_state(0, 3)) xor rk_state(0, 3);
+
+                    -- Row 1: shift 1 right
+                    aes_state(1, 0) <= ters_bayt_degistir(aes_state(1, 3)) xor rk_state(1, 0);
+                    aes_state(1, 1) <= ters_bayt_degistir(aes_state(1, 0)) xor rk_state(1, 1);
+                    aes_state(1, 2) <= ters_bayt_degistir(aes_state(1, 1)) xor rk_state(1, 2);
+                    aes_state(1, 3) <= ters_bayt_degistir(aes_state(1, 2)) xor rk_state(1, 3);
+
+                    -- Row 2: shift 2 right
+                    aes_state(2, 0) <= ters_bayt_degistir(aes_state(2, 2)) xor rk_state(2, 0);
+                    aes_state(2, 1) <= ters_bayt_degistir(aes_state(2, 3)) xor rk_state(2, 1);
+                    aes_state(2, 2) <= ters_bayt_degistir(aes_state(2, 0)) xor rk_state(2, 2);
+                    aes_state(2, 3) <= ters_bayt_degistir(aes_state(2, 1)) xor rk_state(2, 3);
+
+                    -- Row 3: shift 3 right
+                    aes_state(3, 0) <= ters_bayt_degistir(aes_state(3, 1)) xor rk_state(3, 0);
+                    aes_state(3, 1) <= ters_bayt_degistir(aes_state(3, 2)) xor rk_state(3, 1);
+                    aes_state(3, 2) <= ters_bayt_degistir(aes_state(3, 3)) xor rk_state(3, 2);
+                    aes_state(3, 3) <= ters_bayt_degistir(aes_state(3, 0)) xor rk_state(3, 3);
 
                     if round_num = to_unsigned(0, 4) then
                         fsm_state <= FINISHED;
                     else
-                        stall_count <= unsigned(lfsr_reg(1 downto 0));
-                        fsm_state <= RANDOM_STALL;
+                        fsm_state <= INV_MIX_COLUMNS;
                     end if;
 
-                when RANDOM_STALL =>
+                when STALL_STATE =>
                     if stall_count = "00" then
-                        fsm_state <= INV_MIX_COLUMNS;
+                        fsm_state <= INV_SHIFT_SUB_ADD;
                     else
                         stall_count <= stall_count - 1;
-                        fsm_state <= RANDOM_STALL;
                     end if;
 
                 when INV_MIX_COLUMNS =>
@@ -171,9 +159,8 @@ begin
                     end loop;
 
                     round_num <= round_num - 1;
-                    fsm_state <= INV_SHIFT_ROWS;
-
-
+                    stall_count <= unsigned(lfsr_reg(1 downto 0));
+                    fsm_state <= STALL_STATE;
                 when FINISHED =>
                     duz_metin <= durumdan_vektore(aes_state);
                     done <= '1';

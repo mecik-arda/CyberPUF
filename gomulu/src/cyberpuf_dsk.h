@@ -21,6 +21,7 @@
 #define KONTROL_ANAHTAR_URET_BITI      (1 << 0)
 #define KONTROL_SIFRE_COZ_BASLA_BITI     (1 << 1)
 #define KONTROL_DURUM_TEMIZLE_BITI      (1 << 4)
+#define KONTROL_MOD_SECIMI_BITI         (1 << 5) // 0: PIO, 1: DMA
 
 #define DURUM_PUF_MESGUL_BITI        (1 << 0)
 #define DURUM_PUF_TAMAM_BITI        (1 << 1)
@@ -29,16 +30,33 @@
 #define DURUM_AES_MESGUL_BITI        (1 << 4)
 #define DURUM_AES_TAMAM_BITI        (1 << 5)
 
-void CyberPUF_Baslat(uint32_t taban_adresi);
+typedef enum {
+    CYBERPUF_MODE_PIO = 1,
+    CYBERPUF_MODE_DMA = 2
+} CyberPUF_TransferMode;
 
-bool CyberPUF_AnahtarUret(void);
+typedef struct {
+    uint32_t BaseAddress;
+    CyberPUF_TransferMode AktifMod;
+    bool IsBusy;
+    void (*DmaDoneHandler)(void *CallBackRef);
+    void *CallBackRef;
+} CyberPUF_Instance;
 
-bool CyberPUF_BlokSifreCoz(const uint8_t* sifreli_metin_16b, uint8_t* duz_metin_16b);
+void CyberPUF_Baslat(CyberPUF_Instance *InstancePtr, uint32_t taban_adresi, CyberPUF_TransferMode mod);
 
-bool CyberPUF_TamponSifreCoz(const uint8_t* sifreli_metin, uint8_t* duz_metin, uint32_t boyut_bayt, const uint8_t* iv);
+bool CyberPUF_AnahtarUret(CyberPUF_Instance *InstancePtr);
 
-void CyberPUF_PUFAnahtariAl(uint8_t* anahtar_tamponu_32b);
+bool CyberPUF_BlokSifreCoz(CyberPUF_Instance *InstancePtr, const uint8_t* sifreli_metin_16b, uint8_t* duz_metin_16b);
 
-uint32_t CyberPUF_DurumAl(void);
+bool CyberPUF_TamponSifreCoz(CyberPUF_Instance *InstancePtr, const uint8_t* sifreli_metin, uint8_t* duz_metin, uint32_t boyut_bayt, const uint8_t* iv);
+
+void CyberPUF_PUFAnahtariAl(CyberPUF_Instance *InstancePtr, uint8_t* anahtar_tamponu_32b);
+
+uint32_t CyberPUF_DurumAl(CyberPUF_Instance *InstancePtr);
+
+#define CYBERPUF_REG_PUF_ANAHTAR_YAZ_0    0x50
+
+void CyberPUF_TemizAnahtarYaz(CyberPUF_Instance *InstancePtr, const uint8_t* temiz_anahtar_32b);
 
 #endif

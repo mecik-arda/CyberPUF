@@ -18,11 +18,19 @@ end entity aes256_sifreleyici;
 
 architecture rtl of aes256_sifreleyici is
 
-    type state_t is (IDLE, INIT_ADD_KEY, ROUND_SUB_BYTES, ROUND_SHIFT_ROWS, ROUND_MIX_COLUMNS, ROUND_ADD_KEY, FINAL_ADD_KEY, FINISHED);
+    type state_t is (IDLE, INIT_ADD_KEY, STALL_STATE, ROUND_SUB_BYTES, ROUND_MIX_COLUMNS, ROUND_ADD_KEY, FINAL_ADD_KEY, FINISHED);
     signal fsm_state : state_t;
 
     signal aes_state : durum_dizisi_t;
     signal round_num : unsigned(3 downto 0);
+
+    -- SCA Countermeasures (Side-Channel Attack)
+    signal lfsr_reg : std_logic_vector(31 downto 0) := x"ACE10001";
+    signal noise_reg : std_logic_vector(31 downto 0) := (others => '0');
+    attribute keep : string;
+    attribute keep of noise_reg : signal is "true";
+    signal stall_count : unsigned(1 downto 0) := "00";
+    signal free_running_counter : unsigned(31 downto 0) := x"1337BEEF";
 
 begin
 
@@ -44,6 +52,10 @@ begin
                 end loop;
             end loop;
         elsif rising_edge(clk) then
+            free_running_counter <= free_running_counter + 1;
+            lfsr_reg <= lfsr_reg(30 downto 0) & (lfsr_reg(31) xor lfsr_reg(21) xor lfsr_reg(1) xor lfsr_reg(0));
+            noise_reg <= noise_reg(30 downto 0) & lfsr_reg(31);
+
             done <= '0';
 
             case fsm_state is
@@ -53,6 +65,13 @@ begin
                         aes_state <= vektorden_duruma(duz_metin);
                         round_num <= (others => '0');
                         busy <= '1';
+                        
+                        if free_running_counter = x"00000000" then
+                            lfsr_reg <= x"ACE10001";
+                        else
+                            lfsr_reg <= std_logic_vector(free_running_counter);
+                        end if;
+                        
                         fsm_state <= INIT_ADD_KEY;
                     end if;
 
@@ -65,33 +84,40 @@ begin
                         end loop;
                     end loop;
                     round_num <= to_unsigned(1, 4);
-                    fsm_state <= ROUND_SUB_BYTES;
+                    stall_count <= unsigned(lfsr_reg(1 downto 0));
+                    fsm_state <= STALL_STATE;
+
+                when STALL_STATE =>
+                    if stall_count = "00" then
+                        fsm_state <= ROUND_SUB_BYTES;
+                    else
+                        stall_count <= stall_count - 1;
+                    end if;
 
                 when ROUND_SUB_BYTES =>
-                    for r in 0 to 3 loop
-                        for c in 0 to 3 loop
-                            aes_state(r, c) <= bayt_degistir(aes_state(r, c));
-                        end loop;
-                    end loop;
-                    fsm_state <= ROUND_SHIFT_ROWS;
+                    -- Row 0: no shift
+                    aes_state(0, 0) <= bayt_degistir(aes_state(0, 0));
+                    aes_state(0, 1) <= bayt_degistir(aes_state(0, 1));
+                    aes_state(0, 2) <= bayt_degistir(aes_state(0, 2));
+                    aes_state(0, 3) <= bayt_degistir(aes_state(0, 3));
 
-                when ROUND_SHIFT_ROWS =>
-                    temp_state := aes_state;
+                    -- Row 1: shift 1 left
+                    aes_state(1, 0) <= bayt_degistir(aes_state(1, 1));
+                    aes_state(1, 1) <= bayt_degistir(aes_state(1, 2));
+                    aes_state(1, 2) <= bayt_degistir(aes_state(1, 3));
+                    aes_state(1, 3) <= bayt_degistir(aes_state(1, 0));
 
-                    aes_state(1, 0) <= temp_state(1, 1);
-                    aes_state(1, 1) <= temp_state(1, 2);
-                    aes_state(1, 2) <= temp_state(1, 3);
-                    aes_state(1, 3) <= temp_state(1, 0);
+                    -- Row 2: shift 2 left
+                    aes_state(2, 0) <= bayt_degistir(aes_state(2, 2));
+                    aes_state(2, 1) <= bayt_degistir(aes_state(2, 3));
+                    aes_state(2, 2) <= bayt_degistir(aes_state(2, 0));
+                    aes_state(2, 3) <= bayt_degistir(aes_state(2, 1));
 
-                    aes_state(2, 0) <= temp_state(2, 2);
-                    aes_state(2, 1) <= temp_state(2, 3);
-                    aes_state(2, 2) <= temp_state(2, 0);
-                    aes_state(2, 3) <= temp_state(2, 1);
-
-                    aes_state(3, 0) <= temp_state(3, 3);
-                    aes_state(3, 1) <= temp_state(3, 0);
-                    aes_state(3, 2) <= temp_state(3, 1);
-                    aes_state(3, 3) <= temp_state(3, 2);
+                    -- Row 3: shift 3 left
+                    aes_state(3, 0) <= bayt_degistir(aes_state(3, 3));
+                    aes_state(3, 1) <= bayt_degistir(aes_state(3, 0));
+                    aes_state(3, 2) <= bayt_degistir(aes_state(3, 1));
+                    aes_state(3, 3) <= bayt_degistir(aes_state(3, 2));
 
                     if round_num = to_unsigned(14, 4) then
                         fsm_state <= FINAL_ADD_KEY;
@@ -122,7 +148,8 @@ begin
                         end loop;
                     end loop;
                     round_num <= round_num + 1;
-                    fsm_state <= ROUND_SUB_BYTES;
+                    stall_count <= unsigned(lfsr_reg(1 downto 0));
+                    fsm_state <= STALL_STATE;
 
                 when FINAL_ADD_KEY =>
                     rk_vec := tur_anahtarlari(14);

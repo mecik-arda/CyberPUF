@@ -26,8 +26,14 @@ ENV/
 env.bak/
 venv.bak/
 
+# Environment variables (SENSITIVE!)
+.env
+.env.local
+.env.*.local
+
 # Project Specific Data / Binary Outputs
 *.h5
+*.keras
 *.bin
 *.cpuf
 *.cpfe

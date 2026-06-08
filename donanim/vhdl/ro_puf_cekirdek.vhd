@@ -4,7 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity ro_puf_cekirdek is
     generic (
-        RO_CIFT_SAYISI     : integer := 16;
+        RO_CIFT_SAYISI     : integer := 256;
         INVERTER_SAYISI    : integer := 3;
         SAYICI_GENISLIGI    : integer := 20;
         SAYMA_DONGULERI     : integer := 1000
@@ -36,12 +36,27 @@ architecture rtl of ro_puf_cekirdek is
     signal selected_ro_a : integer range 0 to TOTAL_RO - 1;
     signal selected_ro_b : integer range 0 to TOTAL_RO - 1;
 
+    signal ro_clk_a_mux : std_logic;
+    signal ro_clk_b_mux : std_logic;
     signal ro_clk_a : std_logic;
     signal ro_clk_b : std_logic;
     signal count_enable : std_logic;
     signal clear_counters : std_logic;
 
-    type state_t is (IDLE, SELECT_RO, COUNTING, COMPARE, OUTPUT_RESULT);
+    signal clear_counters_sync_a1, clear_counters_sync_a2 : std_logic := '1';
+    signal count_enable_sync_a1, count_enable_sync_a2 : std_logic := '0';
+
+    signal clear_counters_sync_b1, clear_counters_sync_b2 : std_logic := '1';
+    signal count_enable_sync_b1, count_enable_sync_b2 : std_logic := '0';
+
+    component BUFG is
+        port (
+            O : out std_logic;
+            I : in  std_logic
+        );
+    end component;
+
+    type state_t is (IDLE, SELECT_RO, WAIT_CLEAR, COUNTING, WAIT_SYNC, COMPARE, OUTPUT_RESULT);
     signal state : state_t;
 
     component halka_osilator is
@@ -69,26 +84,39 @@ begin
             );
     end generate gen_ro;
 
-    ro_clk_a <= ro_output(selected_ro_a) when selected_ro_a < TOTAL_RO else '0';
-    ro_clk_b <= ro_output(selected_ro_b) when selected_ro_b < TOTAL_RO else '0';
+    ro_clk_a_mux <= ro_output(selected_ro_a) when selected_ro_a < TOTAL_RO else '0';
+    ro_clk_b_mux <= ro_output(selected_ro_b) when selected_ro_b < TOTAL_RO else '0';
 
-    process(ro_clk_a, clear_counters)
+    bufg_a_inst : BUFG port map (I => ro_clk_a_mux, O => ro_clk_a);
+    bufg_b_inst : BUFG port map (I => ro_clk_b_mux, O => ro_clk_b);
+
+    process(ro_clk_a)
     begin
-        if clear_counters = '1' then
-            sayac_a <= (others => '0');
-        elsif rising_edge(ro_clk_a) then
-            if count_enable = '1' then
+        if rising_edge(ro_clk_a) then
+            clear_counters_sync_a1 <= clear_counters;
+            clear_counters_sync_a2 <= clear_counters_sync_a1;
+            count_enable_sync_a1 <= count_enable;
+            count_enable_sync_a2 <= count_enable_sync_a1;
+            
+            if clear_counters_sync_a2 = '1' then
+                sayac_a <= (others => '0');
+            elsif count_enable_sync_a2 = '1' then
                 sayac_a <= sayac_a + 1;
             end if;
         end if;
     end process;
 
-    process(ro_clk_b, clear_counters)
+    process(ro_clk_b)
     begin
-        if clear_counters = '1' then
-            sayac_b <= (others => '0');
-        elsif rising_edge(ro_clk_b) then
-            if count_enable = '1' then
+        if rising_edge(ro_clk_b) then
+            clear_counters_sync_b1 <= clear_counters;
+            clear_counters_sync_b2 <= clear_counters_sync_b1;
+            count_enable_sync_b1 <= count_enable;
+            count_enable_sync_b2 <= count_enable_sync_b1;
+            
+            if clear_counters_sync_b2 = '1' then
+                sayac_b <= (others => '0');
+            elsif count_enable_sync_b2 = '1' then
                 sayac_b <= sayac_b + 1;
             end if;
         end if;
@@ -138,10 +166,18 @@ begin
                     ro_aktif(pair_index * 2) <= '1';
                     ro_aktif(pair_index * 2 + 1) <= '1';
 
-                    clear_counters <= '0';
+                    clear_counters <= '1';
                     count_enable <= '0';
                     ref_counter <= (others => '0');
-                    state <= COUNTING;
+                    state <= WAIT_CLEAR;
+
+                when WAIT_CLEAR =>
+                    ref_counter <= ref_counter + 1;
+                    if ref_counter = to_unsigned(7, SAYICI_GENISLIGI) then
+                        clear_counters <= '0';
+                        ref_counter <= (others => '0');
+                        state <= COUNTING;
+                    end if;
 
                 when COUNTING =>
                     count_enable <= '1';
@@ -149,7 +185,15 @@ begin
 
                     if ref_counter = to_unsigned(SAYMA_DONGULERI - 1, SAYICI_GENISLIGI) then
                         count_enable <= '0';
-                        ro_aktif <= (others => '0');
+                        -- ro_aktif stays ON to allow synchronizers to clear safely
+                        ref_counter <= (others => '0');
+                        state <= WAIT_SYNC;
+                    end if;
+
+                when WAIT_SYNC =>
+                    ref_counter <= ref_counter + 1;
+                    if ref_counter = to_unsigned(15, SAYICI_GENISLIGI) then
+                        ro_aktif <= (others => '0'); -- Now it's safe to turn off RO
                         state <= COMPARE;
                     end if;
 
