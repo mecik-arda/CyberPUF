@@ -80,6 +80,17 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 - **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile teorik hata düzeltme kapasitesi sunarak onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`). Global Timer üzerinden (XTime_GetTime) tam rastgele tohumlanır.
 - **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D (Cache-friendly Loop), MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
 
+#### Kriptografik Bütünlük ve HMAC/KDF Seçenekleri
+Sistem, şifrelenmiş model ağırlıklarının bütünlüğünü (Integrity) ve kurcalama korumasını (Tamper Resistance) doğrulamak için iki farklı mod sunar:
+1. **Doğrudan (Direct) HMAC Modu:**
+   - **Çalışma Prensibi:** RO-PUF'tan üretilen donanım anahtarı, şifreli verilerin bütünlüğünü denetlemek için doğrudan HMAC-SHA256 anahtarı olarak kullanılır.
+   - **Avantajı:** Bare-metal gömülü tarafta (C) neredeyse sıfır gecikme (latency) ile çalışır ve son derece yüksek performans sağlar.
+   - **Kullanım Senaryosu:** İşlem gücü ve kaynakları çok sınırlı olan gömülü uç cihazlar.
+2. **PBKDF2-HMAC Modu:**
+   - **Çalışma Prensibi:** Donanım anahtarı, 600,000 iterasyonluk PBKDF2-HMAC-SHA256 esnetme işleminden geçirilerek türetilmiş bir HMAC anahtarı üretilir.
+   - **Avantajı:** Çok yüksek kriptografik direnç sağlar ve ham PUF anahtarının doğrudan kullanımını engeller.
+   - **Sınırlama:** Donanım ivmelendirici bulunmayan bare-metal işlemcilerde PBKDF2 işlemini yazılımsal olarak koşturmak çok uzun zaman aldığından, gömülü C simülasyonunda bu mod algılandığında güvenlik uyarısı verilerek doğrulama aşaması bypass edilir.
+
 ### Test Sonuçları (Donanım AES-256 Crypto Core)
 GHDL simülasyonu ile donanımın şifre çözme performansı ve doğruluğu başarıyla test edilmiştir. Aşağıda VHDL Testbench'inin doğrudan çıktısı bulunmaktadır:
 
@@ -204,6 +215,17 @@ The project is structured into three continuous phases that bridge Software AI, 
 - **SHA-256 Integrity Verification:** Integrated a lightweight bare-metal `sha256.c` library. If the decrypted payload's digest does not match the header's expected digest, the system enters Panic Mode and securely wipes the memory.
 - **Fuzzy Extractor (Helper Data Generator):** A smart error correction module (`yardimci_veri_uretici.c`) that provides theoretical error correction capacity for temperature/voltage-induced bit errors (noise) in the PUF key using Code-Offset and Hamming(7,4) Error Correction Codes (ECC). Fully randomized using Global Timer bounds (`XTime_GetTime`).
 - **Bare-Metal CNN Engine:** A C-based AI inference engine written entirely from scratch without external libraries. It supports Conv2D (Cache-friendly), MaxPool, Dense, and Fused BatchNorm+ReLU layers, utilizing a ping-pong buffer technique to minimize RAM fragmentation.
+
+#### Cryptographic Integrity & HMAC/KDF Options
+The system supports two distinct verification modes to validate the integrity and ensure the tamper-resistance of the encrypted model weights:
+1. **Direct HMAC Mode:**
+   - **Mechanism:** The raw RO-PUF key is used directly as the HMAC-SHA256 key to verify the integrity of the ciphertext payload.
+   - **Pros:** Near-zero overhead and execution latency on bare-metal microcontrollers (C).
+   - **Best For:** Ultra-low-resource edge devices requiring fast boot times.
+2. **PBKDF2-HMAC Mode:**
+   - **Mechanism:** The raw key is stretched through 600,000 iterations of PBKDF2-HMAC-SHA256 to produce a hardened derived key.
+   - **Pros:** High security margins, preventing any potential leak of the raw PUF key through side channels or oracle attacks.
+   - **Limitations:** Running 600,000 PBKDF2 iterations in pure software on resource-constrained microcontrollers causes significant boot delay. In the bare-metal C simulation environment, detecting this mode triggers a warning log and bypasses the full iteration loop.
 
 ### Test Results (Hardware AES-256 Crypto Core)
 The decryption accuracy and performance of the hardware have been successfully tested via GHDL simulation. Below is the direct output from the VHDL Testbench:
