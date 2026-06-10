@@ -92,7 +92,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
     if not ws_token:
         await websocket.close(code=1008, reason="Token not configured")
         return
-    if token != ws_token:
+    if not token or not hmac.compare_digest(token, ws_token):
         await websocket.close(code=1008, reason="Invalid token")
         return
     await manager.connect(websocket)

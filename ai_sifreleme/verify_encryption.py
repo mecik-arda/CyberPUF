@@ -47,8 +47,15 @@ def parse_encrypted_binary(file_path):
     else:
         raise ValueError(f"Desteklenmeyen mod: 0x{mode_byte:02X}")
 
-    reserved = struct.unpack('<B', data[offset:offset + 1])[0]
+    kdf_mode_byte = struct.unpack('<B', data[offset:offset + 1])[0]
     offset += 1
+    
+    if kdf_mode_byte == 0x01:
+        mac_mode = 'direct'
+    elif kdf_mode_byte == 0x02:
+        mac_mode = 'pbkdf2'
+    else:
+        mac_mode = 'unknown'
 
     metadata_length = struct.unpack('<I', data[offset:offset + 4])[0]
     offset += 4
@@ -99,6 +106,7 @@ def parse_encrypted_binary(file_path):
         'magic': magic.decode('ascii'),
         'version': f'{version_major}.{version_minor}',
         'encryption_mode': encryption_mode,
+        'mac_mode': mac_mode,
         'metadata': metadata,
         'nonce': nonce,
         'auth_tag': auth_tag,
@@ -125,11 +133,14 @@ def decrypt_data(ciphertext, nonce, auth_tag, aes_key, raw_puf_key, mode='GCM', 
         if not expected_hmac:
             raise ValueError("HMAC verification failed! Expected HMAC is missing in CBC mode.")
             
-        mac_salt_hex = metadata.get('mac_salt_hex')
-        if not mac_salt_hex:
-            raise ValueError("HMAC verification failed! mac_salt_hex is missing in metadata.")
-        mac_salt = bytes.fromhex(mac_salt_hex)
-        mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
+        if metadata.get('mac_mode', 'direct') == 'pbkdf2':
+            mac_salt_hex = metadata.get('mac_salt_hex')
+            if not mac_salt_hex:
+                raise ValueError("HMAC verification failed! mac_salt_hex is missing in metadata.")
+            mac_salt = bytes.fromhex(mac_salt_hex)
+            mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
+        else:
+            mac_key = raw_puf_key
         
         h = hmac.new(mac_key, digestmod=hashlib.sha256)
         h.update(aad)
@@ -313,7 +324,7 @@ def verify_encryption():
         parsed = parse_encrypted_binary(encrypted_file)
         print(f"  Magic Number     : {parsed['magic']}")
         print(f"  Versiyon         : {parsed['version']}")
-        print(f"  Sifreleme Modu   : {parsed['encryption_mode']}")
+        print(f"  Sifreleme Modu   : {parsed['encryption_mode']} (KDF: {parsed.get('mac_mode', 'unknown')})")
         print(f"  Dosya Boyutu     : {parsed['total_file_size']:,} byte")
         print(f"  Header Boyutu    : {parsed['header_size']:,} byte")
         print(f"  Sifreli Boyut    : {parsed['ciphertext_size']:,} byte")

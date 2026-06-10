@@ -3,7 +3,7 @@ import sys
 import time
 
 
-def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='CBC', quant_mode='int8_weight'):
+def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='CBC', quant_mode='int8_weight', mac_mode='direct'):
     print("=" * 70)
     print("CyberPUF - Faz 1: Tam Pipeline Calistirma")
     print("Gelistirici: Arda Mecik")
@@ -13,6 +13,7 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     print(f"  Ogrenme hizi       : {ogrenme_orani}")
     print(f"  Sifreleme modu     : AES-256-{sifreleme_modu}")
     print(f"  Nicemleme (Quant)  : {quant_mode}")
+    print(f"  MAC Modu (KDF)     : {mac_mode}")
     print("=" * 70)
 
     toplam_baslangic = time.time()
@@ -80,7 +81,7 @@ def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, si
     try:
         from ai_sifreleme.encrypt_weights import encrypt_weights
         sifreli_ikili_veri, aes_anahtari, nonce_degeri, kimlik_dogrulama_etiketi = encrypt_weights(
-            encryption_mode=sifreleme_modu
+            encryption_mode=sifreleme_modu, mac_mode=mac_mode
         )
     except Exception as e:
         print(f"\n  HATA: Adim 3 (AES-256 Sifreleme) basarisiz oldu: {e}")
@@ -130,6 +131,7 @@ if __name__ == '__main__':
     pipeline_ogrenme_orani = 0.001
     pipeline_modu = 'CBC'
     pipeline_quant_mode = 'int8_weight'
+    pipeline_mac_mode = 'direct'
 
     try:
         if len(sys.argv) > 1:
@@ -147,6 +149,9 @@ if __name__ == '__main__':
         if len(sys.argv) > 5:
             pipeline_quant_mode = sys.argv[5].lower()
             if pipeline_quant_mode not in ('fp32', 'int8_weight', 'int8_full'): raise ValueError("Quant mode 'fp32', 'int8_weight' veya 'int8_full' olmali")
+        if len(sys.argv) > 6:
+            pipeline_mac_mode = sys.argv[6].lower()
+            if pipeline_mac_mode not in ('direct', 'pbkdf2'): raise ValueError("MAC mode 'direct' veya 'pbkdf2' olmali")
     except ValueError as e:
         print(f"HATA: Gecersiz arguman: {e}")
         sys.exit(1)
@@ -156,7 +161,8 @@ if __name__ == '__main__':
         yigin_boyutu=pipeline_yigin_boyutu,
         ogrenme_orani=pipeline_ogrenme_orani,
         sifreleme_modu=pipeline_modu,
-        quant_mode=pipeline_quant_mode
+        quant_mode=pipeline_quant_mode,
+        mac_mode=pipeline_mac_mode
     )
 
     sys.exit(0 if basari_durumu else 1)

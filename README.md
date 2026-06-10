@@ -52,7 +52,7 @@ CyberPUF, uç cihazlarda (FPGA ve SoC mimarileri gibi) konuşlandırılan yapay 
 Sistemin uçtan uca kontrolü ve görselleştirilmesi için geliştirilmiş modern, asenkron ve siberpunk temalı web arayüzü:
 - **Dinamik Görev Konsolları:** Her işlem (Eğitim, Donanım Sentezi, Simülasyon) için dinamik olarak açılan ve kapatılabilen yan yana WebSocket konsolları.
 - **Canlı Sistem Logları:** `asyncio.gather` destekli, darboğazsız asenkron WebSocket yayını.
-- **Güvenlik Mimarisi:** API Rotalarında JWT/Bearer tabanlı kimlik doğrulama, `hmac.compare_digest` ile Zamanlama Saldırısı (Timing Attack) koruması, CSRF denetimleri ve tam izolasyon.
+- **Güvenlik Mimarisi:** API Rotalarında Statik Bearer tabanlı kimlik doğrulama, `hmac.compare_digest` ile Zamanlama Saldırısı (Timing Attack) koruması, CSRF denetimleri ve tam izolasyon.
 - **Gizlilik:** Loglarda kullanıcının bilgisayarındaki asıl dosya yollarının maskelenmesi (Path Masking).
 - **Ağırlık Görselleştirici (Weight Viz):** Şifrelenmiş anlamsız ağırlıkların, şifrelenmeden önceki (çözülmüş) haliyle arasındaki farkın piksel piksel ekranda gösterilmesi.
 
@@ -64,19 +64,20 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 - **Model Eğitimi:** CIFAR-10 veri seti üzerinde TensorFlow/Keras kullanılarak Evrişimli Sinir Ağı (CNN) eğitilir.
 - **CPUF Format Dönüşümü:** Ağırlıklar ve bias'lar `.h5` dosyasından çıkarılır ve dinamik meta veriler ile ham `float32` tensörlerini içeren özel bir ikili formata (`.cpuf`) dönüştürülür.
 - **AES-256-CBC & SHA-256 Şifreleme:** `pycryptodome` kütüphanesi kullanılarak `.cpuf` dosyası PKCS7 dolgusu ile AES-256-CBC modunda şifrelenir. Güvenlik bütünlüğü (Tamper Detection) için ağırlıkların donanım öncesi `SHA-256` özeti hesaplanarak başlığa (header) dinamik olarak eklenir. `CYBERPUF_AES_KEY` ortam değişkeni fail-fast güvenlik kalkanıyla korunur.
+- **KDF ve HMAC:** PBKDF2-HMAC-SHA256 ile anahtar türetme veya doğrudan (Direct) HMAC modları ile esnek kriptografik bütünlük sağlar.
 - **Doğrulama:** Şifreleme sürecinin bütünlüğünü ve kurcalama korumasını test eden uçtan uca Python doğrulama betiği.
 
 #### Faz 2: Donanım Güvenliği ve Kriptografi (VHDL)
 - **Ring Oscillator PUF (RO-PUF):** 16 çift (toplam 32) Ring Oscillator ile inşa edilen özel bir fiziksel klonlanamaz fonksiyon. Üretim varyasyonlarını kullanarak eşsiz bir 256-bit anahtar üretir.
 - **Anahtar Üretimi:** Ortam gürültüsünü ortadan kaldırmak için bit başına 16 kez PUF salınımlarını örnekleyen çoğunluk oylaması (majority-voting) mekanizması.
 - **AES-256 Çözümleme Motoru:** FIPS-197 uyumlu, tam donanımlı AES çözümleme boru hattı (pipeline).
-- **Yan Kanal Saldırı Koruması (SCA Countermeasures):** AES şifre çözme modülüne entegre edilmiş LFSR tabanlı yapay güç gürültüsü üreteci ve rastgele gecikme (Random Stall) enjeksiyonu. Güç Analizi (DPA/CPA) ve Elektromanyetik (EMA) saldırılarına karşı donanımsal koruma sağlar.
+- **Yan Kanal Saldırı Koruması (SCA Countermeasures):** AES şifre çözme modülüne entegre edilmiş LFSR tabanlı yapay güç gürültüsü üreteci ve rastgele gecikme (Random Stall) enjeksiyonu. Güç Analizi (DPA/CPA) ve Elektromanyetik (EMA) saldırılarına karşı koruma önlemleri simüle edilmiştir.
 - **AXI4-Lite Wrapper:** İşlemci Sistemi (ARM Cortex-A) ile haberleşmeyi sağlamak için tüm kriptografi çekirdeğinin 20 farklı bellek eşlemeli (memory-mapped) yazmaç ile (0x00 - 0x4C) AXI4-Lite arayüzüne sarılması.
 
 #### Faz 3: Gömülü Yapay Zeka Çıkarımı (C/C++ Bare-Metal)
 - **Donanım Soyutlama Katmanı (HAL):** Memory-mapped I/O üzerinden VHDL modüllerini kontrol eden, PUF üretimini tetikleyen ve AES motoruna 16-byte'lık şifreli bloklar besleyen özel C sürücüleri (`cyberpuf_dsk.c`). Yazılım tarafında AES-CBC XOR zincirlemesini yönetir.
 - **SHA-256 Bütünlük Testi:** Bare-metal uyumlu C tabanlı `sha256.c` entegrasyonu. Çözülen modelin özeti hesaplanıp header'daki orijinal özet ile eşleştirilmezse donanım Panic Mode'a geçerek belleği güvenle imha eder (Secure Wipe).
-- **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile %100 oranında onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`). Global Timer üzerinden (XTime_GetTime) tam rastgele tohumlanır.
+- **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile teorik hata düzeltme kapasitesi sunarak onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`). Global Timer üzerinden (XTime_GetTime) tam rastgele tohumlanır.
 - **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D (Cache-friendly Loop), MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
 
 ### Test Sonuçları (Donanım AES-256 Crypto Core)
@@ -177,7 +178,7 @@ CyberPUF is an advanced Hardware Security and Embedded AI project designed to pr
 A modern, asynchronous, cyberpunk-themed web interface designed for end-to-end control and visualization of the system:
 - **Dynamic Task Consoles:** Side-by-side, dismissible WebSocket consoles dynamically spawned for each pipeline stage (Training, Synthesis, Simulation).
 - **Live System Logs:** Bottleneck-free asynchronous WebSocket broadcasting powered by `asyncio.gather`.
-- **Security Architecture:** JWT/Bearer token-based authentication on API routes, Timing Attack protection using `hmac.compare_digest`, CSRF validation, and strict Content Security Policies.
+- **Security Architecture:** Static Bearer token-based authentication on API routes, Timing Attack protection using `hmac.compare_digest`, CSRF validation, and strict Content Security Policies.
 - **Privacy Enforcement:** Intelligent absolute-path masking within terminal logs to prevent local directory leakage.
 - **Weight Visualizer:** Real-time visual comparison engine that displays neural network weights before encryption (structured) and after encryption (random noise).
 
@@ -189,6 +190,7 @@ The project is structured into three continuous phases that bridge Software AI, 
 - **Model Training:** A Convolutional Neural Network (CNN) is trained on the CIFAR-10 dataset using TensorFlow/Keras. The architecture features Conv2D blocks with Batch Normalization and ReLU.
 - **CPUF Format Serialization:** Weights and biases are extracted from the `.h5` file and serialized into a custom binary format (`.cpuf`), which includes dynamic metadata, magic numbers, and raw `float32` tensors.
 - **AES-256-CBC & SHA-256 Encryption:** The `pycryptodome` library encrypts the `.cpuf` binary using AES-256 in CBC mode with PKCS7 Padding. To ensure tamper-resistance, a SHA-256 digest of the plaintext weights is dynamically appended to the header. Built-in `CYBERPUF_AES_KEY` environment variable enforcement blocks unauthorized execution.
+- **KDF & HMAC:** Selectable cryptographic integrity via either a PBKDF2-HMAC-SHA256 key derivation function or a Direct HMAC mode.
 - **Verification:** An end-to-end Python test suite ensures the integrity, decryption accuracy, and tamper-resistance of the encryption pipeline.
 
 #### Phase 2: Hardware Security & Cryptography (VHDL)
@@ -200,7 +202,7 @@ The project is structured into three continuous phases that bridge Software AI, 
 #### Phase 3: Embedded AI Inference (C/C++ Bare-Metal)
 - **Hardware Abstraction Layer (HAL):** Custom C drivers (`cyberpuf_dsk.c`) to control the VHDL IP via memory-mapped I/O, trigger PUF generation, and feed encrypted 16-byte blocks to the AES engine. Implements AES-CBC XOR chaining completely in software.
 - **SHA-256 Integrity Verification:** Integrated a lightweight bare-metal `sha256.c` library. If the decrypted payload's digest does not match the header's expected digest, the system enters Panic Mode and securely wipes the memory.
-- **Fuzzy Extractor (Helper Data Generator):** A smart error correction module (`yardimci_veri_uretici.c`) that perfectly corrects temperature/voltage-induced bit errors (noise) in the PUF key using Code-Offset and Hamming(7,4) Error Correction Codes (ECC). Fully randomized using Global Timer bounds (`XTime_GetTime`).
+- **Fuzzy Extractor (Helper Data Generator):** A smart error correction module (`yardimci_veri_uretici.c`) that provides theoretical error correction capacity for temperature/voltage-induced bit errors (noise) in the PUF key using Code-Offset and Hamming(7,4) Error Correction Codes (ECC). Fully randomized using Global Timer bounds (`XTime_GetTime`).
 - **Bare-Metal CNN Engine:** A C-based AI inference engine written entirely from scratch without external libraries. It supports Conv2D (Cache-friendly), MaxPool, Dense, and Fused BatchNorm+ReLU layers, utilizing a ping-pong buffer technique to minimize RAM fragmentation.
 
 ### Test Results (Hardware AES-256 Crypto Core)

@@ -42,7 +42,7 @@ def encrypt_aes256_cbc(plaintext_data, aes_key):
 
 
 
-def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
+def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM', mac_mode='direct'):
     output = bytearray()
 
     output.extend(ENCRYPTED_FILE_MAGIC)
@@ -57,7 +57,12 @@ def build_encrypted_binary(ciphertext, nonce, auth_tag, metadata, mode='GCM'):
     else:
         raise ValueError("Desteklenmeyen mod.")
 
-    output.extend(struct.pack('<B', 0x00))
+    if mac_mode == 'direct':
+        output.extend(struct.pack('<B', 0x01))
+    elif mac_mode == 'pbkdf2':
+        output.extend(struct.pack('<B', 0x02))
+    else:
+        output.extend(struct.pack('<B', 0x00))
 
     if metadata:
         metadata_json = json.dumps(metadata).encode('utf-8')
@@ -178,7 +183,7 @@ def generate_c_header_chunked(encrypted_data, output_dir, array_name='encrypted_
     return chunk_files
 
 
-def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
+def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='direct'):
     base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'output')
     export_dir = os.path.join(base_dir, 'exported_weights')
     encrypt_dir = os.path.join(base_dir, 'encrypted_weights')
@@ -195,7 +200,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     print("=" * 70)
     print("CyberPUF - Faz 1: AES-256 Agirlik Sifreleme")
     print("Gelistirici: Arda Mecik")
-    print(f"Sifreleme Modu: AES-256-{encryption_mode}")
+    print(f"Sifreleme Modu: AES-256-{encryption_mode} (KDF: {mac_mode})")
     print("=" * 70)
 
     print("\n[1/7] Duz metin (plaintext) agirlik dosyasi okunuyor...")
@@ -218,6 +223,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
         'project': 'CyberPUF',
         'developer': 'Arda Mecik',
         'encryption_mode': f'AES-256-{encryption_mode}',
+        'mac_mode': mac_mode,
         'plaintext_size': len(plaintext_data),
         'ciphertext_size': None,
         'plaintext_sha256': plaintext_sha256,
@@ -226,8 +232,9 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
         'key_source': 'PUF_SIMULATED_STATIC'
     }
 
-    mac_salt = secrets.token_bytes(16)
-    encryption_metadata['mac_salt_hex'] = mac_salt.hex()
+    if mac_mode == 'pbkdf2':
+        mac_salt = secrets.token_bytes(16)
+        encryption_metadata['mac_salt_hex'] = mac_salt.hex()
 
     if encryption_mode == 'GCM':
         expected_ciphertext_size = len(plaintext_data)
@@ -245,7 +252,12 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     aad_output.extend(struct.pack('<B', ENCRYPTED_VERSION_MAJOR))
     aad_output.extend(struct.pack('<B', ENCRYPTED_VERSION_MINOR))
     aad_output.extend(struct.pack('<B', 0x01 if encryption_mode == 'GCM' else 0x02))
-    aad_output.extend(struct.pack('<B', 0x00))
+    if mac_mode == 'direct':
+        aad_output.extend(struct.pack('<B', 0x01))
+    elif mac_mode == 'pbkdf2':
+        aad_output.extend(struct.pack('<B', 0x02))
+    else:
+        aad_output.extend(struct.pack('<B', 0x00))
     
     temp_metadata = encryption_metadata.copy()
     if 'ciphertext_hmac' in temp_metadata:
@@ -268,7 +280,10 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     encryption_metadata['ciphertext_size'] = len(ciphertext)
     
     # Key separation: Derive a separate key for MAC
-    mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
+    if mac_mode == 'pbkdf2':
+        mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
+    else:
+        mac_key = raw_puf_key
     
     # Encrypt-then-MAC
     h = hmac.new(mac_key, digestmod=hashlib.sha256)
@@ -307,7 +322,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
     print("\n[5/7] Sifreli ikili (binary) dosya olusturuluyor...")
 
     encrypted_binary = build_encrypted_binary(
-        ciphertext, nonce, auth_tag, encryption_metadata, mode=encryption_mode
+        ciphertext, nonce, auth_tag, encryption_metadata, mode=encryption_mode, mac_mode=mac_mode
     )
 
     encrypted_bin_path = os.path.join(encrypt_dir, 'cyberpuf_encrypted_weights.bin')
@@ -438,18 +453,15 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM'):
 
 
 if __name__ == '__main__':
-    custom_weight_path = None
-    custom_mode = 'GCM'
-
-    if len(sys.argv) > 1:
-        custom_weight_path = sys.argv[1]
-    if len(sys.argv) > 2:
-        custom_mode = sys.argv[2].upper()
-
-    if custom_mode not in ('GCM', 'CBC'):
-        raise ValueError(f"HATA: Gecersiz sifreleme modu: {custom_mode}. Desteklenen modlar: GCM, CBC")
+    import argparse
+    parser = argparse.ArgumentParser(description="CyberPUF Sifreleme Modulu")
+    parser.add_argument("weight_path", nargs='?', default=None, help="Sifrelenecek agirlik dosyasinin yolu")
+    parser.add_argument("--mode", default='GCM', choices=['GCM', 'CBC'], help="Sifreleme modu")
+    parser.add_argument("--mac-mode", default='direct', choices=['direct', 'pbkdf2'], help="HMAC KDF modu")
+    args = parser.parse_args()
 
     encrypt_weights(
-        weight_binary_path=custom_weight_path,
-        encryption_mode=custom_mode
+        weight_binary_path=args.weight_path,
+        encryption_mode=args.mode,
+        mac_mode=args.mac_mode
     )
