@@ -274,6 +274,8 @@ CyberPUF/
 ├── gomulu/                        # Bare-Metal C Application
 │   ├── src/                       # HAL, AI Inference, and main program
 │   │   └── sha256.c               # Cryptographic SHA-256 implementation
+├── static/                        # Web Dashboard Frontend assets (HTML, CSS, JS, Favicon)
+├── main_app.py                    # Web Dashboard Backend server (FastAPI, WebSockets)
 ├── run_phase1.py                  # Python Automation Orchestrator
 ├── requirements.txt               # Python Dependencies
 ├── .gitignore                     # Git ignore rules
@@ -307,3 +309,12 @@ cd gomulu
 gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c src/sha256.c -lm -o cyberpuf_sim.exe
 ./cyberpuf_sim.exe
 ```
+
+**5. Running the Web Dashboard (New)**
+```bash
+# Set up environments as described in Hızlı Başlangıç
+# Then start the dashboard server:
+python main_app.py
+# Open your browser and navigate to http://127.0.0.1:8000
+```
+
