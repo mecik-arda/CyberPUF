@@ -183,7 +183,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch Test Images
     async function loadTestImages() {
         try {
-            const res = await fetch('/api/test_images');
+            const token = await getWsToken();
+            const res = await fetch('/api/test_images', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             imageSelect.innerHTML = '<option value="">-- Bir Görsel Seçin --</option>';
@@ -345,7 +350,11 @@ document.addEventListener('DOMContentLoaded', () => {
         vizError.classList.add('hidden');
         
         try {
-            const res = await fetch('/api/weight_visuals');
+            const res = await fetch('/api/weight_visuals', {
+                headers: {
+                    'Authorization': `Bearer ${cachedWsToken}`
+                }
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             
