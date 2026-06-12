@@ -68,15 +68,15 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 - **Doğrulama:** Şifreleme sürecinin bütünlüğünü ve kurcalama korumasını test eden uçtan uca Python doğrulama betiği.
 
 #### Faz 2: Donanım Güvenliği ve Kriptografi (VHDL)
-- **Ring Oscillator PUF (RO-PUF):** 16 çift (toplam 32) Ring Oscillator ile inşa edilen özel bir fiziksel klonlanamaz fonksiyon. Üretim varyasyonlarını kullanarak eşsiz bir 256-bit anahtar üretir.
-- **Anahtar Üretimi:** Ortam gürültüsünü ortadan kaldırmak için bit başına 16 kez PUF salınımlarını örnekleyen çoğunluk oylaması (majority-voting) mekanizması.
-- **AES-256 Çözümleme Motoru:** FIPS-197 uyumlu, tam donanımlı AES çözümleme boru hattı (pipeline).
+- **Ring Oscillator PUF (RO-PUF):** 256 çift (toplam 512) Halka Osilatör (Ring Oscillator) ile inşa edilen özel bir fiziksel klonlanamaz fonksiyon. Her çift bir bit üreterek donanıma özgü 256-bit bir anahtar elde edilmesini sağlar.
+- **Key Generation:** Ortam gürültüsünü ortadan kaldırmak için bit başına 16 kez PUF salınımlarını örnekleyen çoğunluk oylaması (majority-voting) mekanizması.
+- **AES-256 Kripto Motoru:** FIPS-197 uyumlu, şifreleme ve şifre çözme işlemlerini gerçekleştiren tam donanımlı AES motoru.
 - **Yan Kanal Saldırı Koruması (SCA Countermeasures):** AES şifre çözme modülüne entegre edilmiş LFSR tabanlı yapay güç gürültüsü üreteci ve rastgele gecikme (Random Stall) enjeksiyonu. Güç Analizi (DPA/CPA) ve Elektromanyetik (EMA) saldırılarına karşı koruma önlemleri simüle edilmiştir.
 - **AXI4-Lite Wrapper:** İşlemci Sistemi (ARM Cortex-A) ile haberleşmeyi sağlamak için tüm kriptografi çekirdeğinin 20 farklı bellek eşlemeli (memory-mapped) yazmaç ile (0x00 - 0x4C) AXI4-Lite arayüzüne sarılması.
 
 #### Faz 3: Gömülü Yapay Zeka Çıkarımı (C/C++ Bare-Metal)
 - **Donanım Soyutlama Katmanı (HAL):** Memory-mapped I/O üzerinden VHDL modüllerini kontrol eden, PUF üretimini tetikleyen ve AES motoruna 16-byte'lık şifreli bloklar besleyen özel C sürücüleri (`cyberpuf_dsk.c`). Yazılım tarafında AES-CBC XOR zincirlemesini yönetir.
-- **SHA-256 Bütünlük Testi:** Bare-metal uyumlu C tabanlı `sha256.c` entegrasyonu. Çözülen modelin özeti hesaplanıp header'daki orijinal özet ile eşleştirilmezse donanım Panic Mode'a geçerek belleği güvenle imha eder (Secure Wipe).
+- **HMAC-SHA256 Bütünlük Doğrulaması:** Bare-metal uyumlu C tabanlı `sha256.c` kütüphanesi entegrasyonu. Şifreli modelin HMAC bütünlük değeri zamanlama saldırılarına dirençli (constant-time) şekilde doğrulanmazsa, program deşifre edilmiş bellek tamponunu güvenli bir şekilde sıfırlayarak (secure memory wipe) işlemi sonlandırır.
 - **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile teorik hata düzeltme kapasitesi sunarak onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`). Global Timer üzerinden (XTime_GetTime) tam rastgele tohumlanır.
 - **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D (Cache-friendly Loop), MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
 
@@ -205,14 +205,14 @@ The project is structured into three continuous phases that bridge Software AI, 
 - **Verification:** An end-to-end Python test suite ensures the integrity, decryption accuracy, and tamper-resistance of the encryption pipeline.
 
 #### Phase 2: Hardware Security & Cryptography (VHDL)
-- **Ring Oscillator PUF (RO-PUF):** A custom physical unclonable function built with 16 pairs of Ring Oscillators (32 total). It leverages silicon manufacturing variations to generate a unique, unpredictable 256-bit key. Includes `DONT_TOUCH` and combinatorial loop synthesis attributes to prevent logic optimization.
+- **Ring Oscillator PUF (RO-PUF):** A custom physical unclonable function built with 256 pairs of Ring Oscillators (512 total). It leverages silicon manufacturing variations to generate a unique, unpredictable 256-bit key. Includes `DONT_TOUCH` and combinatorial loop synthesis attributes to prevent logic optimization.
 - **Key Generation:** A robust majority-voting mechanism samples the PUF oscillations 16 times per bit to eliminate environmental noise and temperature variations.
-- **AES-256 Decryption Engine:** A full FIPS-197 compliant AES decryption pipeline with Inverse S-Boxes, Inverse ShiftRows, Inverse MixColumns (using GF(2^8) multipliers), and Key Expansion modules.
+- **AES-256 Crypto Core:** A full FIPS-197 compliant AES encryption and decryption engine with Inverse S-Boxes, Inverse ShiftRows, Inverse MixColumns (using GF(2^8) multipliers), and Key Expansion modules.
 - **AXI4-Lite Wrapper:** The entire crypto-core is wrapped in an AXI4-Lite slave interface with 20 distinct memory-mapped registers (0x00 to 0x4C) for seamless communication with the Processing System (ARM Cortex-A).
 
 #### Phase 3: Embedded AI Inference (C/C++ Bare-Metal)
 - **Hardware Abstraction Layer (HAL):** Custom C drivers (`cyberpuf_dsk.c`) to control the VHDL IP via memory-mapped I/O, trigger PUF generation, and feed encrypted 16-byte blocks to the AES engine. Implements AES-CBC XOR chaining completely in software.
-- **SHA-256 Integrity Verification:** Integrated a lightweight bare-metal `sha256.c` library. If the decrypted payload's digest does not match the header's expected digest, the system enters Panic Mode and securely wipes the memory.
+- **HMAC-SHA256 Integrity Verification:** Integrated a lightweight bare-metal `sha256.c` library. If the ciphertext payload's HMAC digest does not match the expected value using constant-time comparison, the system securely wipes the decrypted memory buffer and aborts execution.
 - **Fuzzy Extractor (Helper Data Generator):** A smart error correction module (`yardimci_veri_uretici.c`) that provides theoretical error correction capacity for temperature/voltage-induced bit errors (noise) in the PUF key using Code-Offset and Hamming(7,4) Error Correction Codes (ECC). Fully randomized using Global Timer bounds (`XTime_GetTime`).
 - **Bare-Metal CNN Engine:** A C-based AI inference engine written entirely from scratch without external libraries. It supports Conv2D (Cache-friendly), MaxPool, Dense, and Fused BatchNorm+ReLU layers, utilizing a ping-pong buffer technique to minimize RAM fragmentation.
 
