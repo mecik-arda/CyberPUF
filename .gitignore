@@ -76,3 +76,21 @@ work-obj08.cf
 
 # CyberPUF Outputs
 output/
+
+# OS Specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Temporary / Backup Files
+*.bak
+*.tmp
+*~
+
+# Python Test & Typing Caches
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
