@@ -153,23 +153,25 @@ cd CyberPUF
 ```
 
 **2. Faz 1'i Çalıştırma (Yapay Zeka ve Şifreleme)**
-Windows PowerShell için:
+Windows PowerShell için (256-bit AES anahtarı için 64 karakterli hex değeri girilmelidir):
 ```powershell
 pip install -r requirements.txt
-$env:CYBERPUF_AES_KEY="0123456789abcdef0123456789abcdef"
+$env:CYBERPUF_AES_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 python run_phase1.py 1 128 0.001 CBC
 ```
 
 **3. Faz 2'yi Derleme (VHDL Donanımı)**
+Not: Bilgisayarınızda `ghdl` yüklü ve PATH'e eklenmiş olmalıdır.
 ```powershell
 cd donanim
 .\compile.ps1
 ```
 
 **4. Faz 3'ü Çalıştırma (Gömülü C Simülasyonu)**
+Host PC'de FreeRTOS ve Xilinx SDK bağımlılıkları olmadan derleme yapabilmek için `-DXILINX_BAREMETAL_SIM=1` bayrağı ve `src/test_goruntusu.c` eklenmelidir:
 ```bash
 cd gomulu
-gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c src/sha256.c -lm -o cyberpuf_sim.exe
+gcc -DXILINX_BAREMETAL_SIM=1 src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c src/sha256.c src/test_goruntusu.c -lm -o cyberpuf_sim.exe
 ./cyberpuf_sim.exe
 ```
 
@@ -312,23 +314,25 @@ cd CyberPUF
 ```
 
 **2. Running Phase 1 (AI Training & Encryption)**
-For Windows PowerShell:
+For Windows PowerShell (Requires a 64-character hex string representing a 256-bit AES key):
 ```powershell
 pip install -r requirements.txt
-$env:CYBERPUF_AES_KEY="0123456789abcdef0123456789abcdef"
+$env:CYBERPUF_AES_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 python run_phase1.py 1 128 0.001 CBC
 ```
 
 **3. Compiling Phase 2 (VHDL Hardware)**
+Note: Make sure `ghdl` is installed and added to your system PATH.
 ```powershell
 cd donanim
 .\compile.ps1
 ```
 
 **4. Running Phase 3 (Embedded C Simulation)**
+To compile on a host PC without Xilinx Vitis SDK and FreeRTOS dependencies, define `-DXILINX_BAREMETAL_SIM=1` and include `src/test_goruntusu.c`:
 ```bash
 cd gomulu
-gcc src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c src/sha256.c -lm -o cyberpuf_sim.exe
+gcc -DXILINX_BAREMETAL_SIM=1 src/main.c src/cyberpuf_dsk.c src/yapay_zeka_cikarimi.c src/yardimci_veri_uretici.c src/sha256.c src/test_goruntusu.c -lm -o cyberpuf_sim.exe
 ./cyberpuf_sim.exe
 ```
 

@@ -252,8 +252,9 @@ async def start_simulation(token: str = Depends(verify_token)):
         return {"error": "gcc bulunamadi. Lutfen PATH'e ekleyin."}
 
     build_cmd = [
-        gcc_path, "src/main.c", "src/cyberpuf_dsk.c", "src/yapay_zeka_cikarimi.c", 
-        "src/yardimci_veri_uretici.c", "src/sha256.c", "-lm", "-o", "cyberpuf_sim.exe"
+        gcc_path, "-DXILINX_BAREMETAL_SIM=1", "src/main.c", "src/cyberpuf_dsk.c", 
+        "src/yapay_zeka_cikarimi.c", "src/yardimci_veri_uretici.c", "src/sha256.c", 
+        "src/test_goruntusu.c", "-lm", "-o", "cyberpuf_sim.exe"
     ]
     
     async def build_and_run():
