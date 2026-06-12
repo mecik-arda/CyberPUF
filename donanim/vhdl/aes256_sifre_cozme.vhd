@@ -30,7 +30,6 @@ architecture rtl of aes256_sifre_cozme is
 
     signal aes_state : durum_dizisi_t;
     signal round_num : unsigned(3 downto 0);
-    signal col_idx   : unsigned(1 downto 0);
 
     -- SCA Countermeasures (Side-Channel Attack)
     signal lfsr_reg : std_logic_vector(31 downto 0) := x"ACE10001";
@@ -54,9 +53,10 @@ begin
             busy <= '0';
             round_num <= (others => '0');
             duz_metin <= (others => '0');
-            lfsr_reg <= x"ACE1";
+            lfsr_reg <= x"ACE10001";
             noise_reg <= (others => '0');
             stall_count <= "00";
+            free_running_counter <= x"1337BEEF";
             for r in 0 to 3 loop
                 for c in 0 to 3 loop
                     aes_state(r, c) <= (others => '0');
@@ -101,7 +101,7 @@ begin
                     end loop;
                     round_num <= to_unsigned(13, 4);
                     
-                    stall_count <= unsigned(lfsr_reg(1 downto 0));
+                    stall_count <= unsigned(lfsr_reg(1 downto 0)); -- TODO: Needs better TRNG for wider stall_count
                     fsm_state <= STALL_STATE;
 
                 when INV_SHIFT_SUB_ADD =>
@@ -159,7 +159,7 @@ begin
                     end loop;
 
                     round_num <= round_num - 1;
-                    stall_count <= unsigned(lfsr_reg(1 downto 0));
+                    stall_count <= unsigned(lfsr_reg(1 downto 0)); -- TODO: Needs better TRNG for wider stall_count
                     fsm_state <= STALL_STATE;
                 when FINISHED =>
                     duz_metin <= durumdan_vektore(aes_state);

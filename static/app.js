@@ -47,7 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const header = document.createElement('div');
             header.className = 'terminal-window-header';
-            header.innerHTML = `<span>${taskName} Konsolu</span><span class="close-term-btn" onclick="document.getElementById('term-${taskId}').remove()">&times;</span>`;
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = taskName + ' Konsolu';
+            const closeSpan = document.createElement('span');
+            closeSpan.className = 'close-term-btn';
+            closeSpan.textContent = '×';
+            closeSpan.onclick = () => document.getElementById(`term-${taskId}`).remove();
+            header.appendChild(titleSpan);
+            header.appendChild(closeSpan);
             
             termBody = document.createElement('div');
             termBody.className = 'terminal-body';
@@ -87,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             targetBody.removeChild(targetBody.firstElementChild);
         }
 
-        // Auto-scroll if at bottom
+        // Auto-scroll to ensure latest logs are visible
         if (isAtBottom) {
             targetBody.scrollTop = targetBody.scrollHeight;
         }
@@ -116,23 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error("Token girilmedi.");
         }
         
-        try {
-            const configRes = await fetch('/api/config', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (!configRes.ok) {
-                throw new Error('Geçersiz token veya yetkilendirme hatası');
-            }
-            const config = await configRes.json();
-            cachedWsToken = config.ws_token;
-            return cachedWsToken;
-        } catch (err) {
-            console.error('Failed to get WebSocket token:', err);
-            logToTerminal(`[HATA] WebSocket token alınamadı: ${err.message}`, 'error');
-            throw err;
-        }
+        cachedWsToken = token;
+        return cachedWsToken;
     }
 
     async function connectWebSocket() {
@@ -141,10 +133,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const wsToken = await getWebSocketToken();
 
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws?token=${wsToken}`;
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
             const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
+            ws.send(JSON.stringify({ type: 'auth', token: wsToken }));
             wsReconnectDelay = 1000;
             wsStatusDot.className = 'dot connected';
             wsStatusText.textContent = 'Canlı Bağlantı Aktif';
@@ -162,7 +155,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
+            if (event.code === 1008) {
+                cachedWsToken = null;
+            }
             wsStatusDot.className = 'dot disconnected';
             wsStatusText.textContent = 'Bağlantı Koptu - Yeniden Deneniyor...';
             setTimeout(connectWebSocket, wsReconnectDelay);
@@ -246,9 +242,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify(payload)
             });
-            if(res.ok) {
-                logToTerminal('[Sistem] Eğitim komutu sunucuya iletildi.', 'info');
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            logToTerminal('[Sistem] Eğitim komutu sunucuya iletildi.', 'info');
         } catch(err) {
             logToTerminal(`[Hata] Eğitim başlatılamadı: ${err.message}`, 'error');
         } finally {
@@ -275,9 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Authorization': `Bearer ${cachedWsToken}`
                 }
             });
-            if(res.ok) {
-                logToTerminal('[Sistem] Simülasyon komutu sunucuya iletildi.', 'info');
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            logToTerminal('[Sistem] Simülasyon komutu sunucuya iletildi.', 'info');
         } catch(err) {
             logToTerminal(`[Hata] Simülasyon başlatılamadı: ${err.message}`, 'error');
             predClass.textContent = 'Hata';
@@ -300,9 +294,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Authorization': `Bearer ${cachedWsToken}`
                     }
                 });
-                if(res.ok) {
-                    logToTerminal('[Sistem] Donanım simülasyon komutu sunucuya iletildi.', 'info');
-                }
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                logToTerminal('[Sistem] Donanım simülasyon komutu sunucuya iletildi.', 'info');
             } catch(err) {
                 logToTerminal(`[Hata] Donanım simülasyonu başlatılamadı: ${err.message}`, 'error');
             } finally {

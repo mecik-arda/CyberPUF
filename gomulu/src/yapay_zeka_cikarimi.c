@@ -9,6 +9,7 @@
 
 CPUF_QuantizationMode_t g_aktif_model_modu = CPUF_MODE_FP32;
 
+// These buffers must reside in DDR
 static float tampon1[MAKS_TAMPON_BOYUTU];
 static float tampon2[MAKS_TAMPON_BOYUTU];
 
@@ -22,22 +23,23 @@ void Conv2D_3x3_Same(const float* giris, float* cikis, const ConvLayerParams* pa
             int cg_end = (w < giris_g - 1) ? 1 : 0;
             
             for (int ck = 0; ck < cikis_k; ck++) {
-                float sum = params->b[ck];
-                for (int cy = cy_start; cy <= cy_end; cy++) {
-                    int r = h + cy;
-                    for (int cg = cg_start; cg <= cg_end; cg++) {
-                        int c = w + cg;
-                        int cy_idx = (cy + 1) * 3 + (cg + 1);
-                        int w_offset = cy_idx * giris_k * cikis_k;
-                        int g_base = (r * giris_g + c) * giris_k;
-                        for (int gk = 0; gk < giris_k; gk++) {
-                            float g_val = giris[g_base + gk];
-                            int w_base = w_offset + gk * cikis_k;
-                            sum += g_val * params->w[w_base + ck];
+                cikis[out_idx + ck] = params->b[ck];
+            }
+            for (int cy = cy_start; cy <= cy_end; cy++) {
+                int r = h + cy;
+                for (int cg = cg_start; cg <= cg_end; cg++) {
+                    int c = w + cg;
+                    int cy_idx = (cy + 1) * 3 + (cg + 1);
+                    int w_offset = cy_idx * giris_k * cikis_k;
+                    int g_base = (r * giris_g + c) * giris_k;
+                    for (int gk = 0; gk < giris_k; gk++) {
+                        float g_val = giris[g_base + gk];
+                        int w_base = w_offset + gk * cikis_k;
+                        for (int ck = 0; ck < cikis_k; ck++) {
+                            cikis[out_idx + ck] += g_val * params->w[w_base + ck];
                         }
                     }
                 }
-                cikis[out_idx + ck] = sum;
             }
         }
     }
@@ -321,6 +323,7 @@ static float* ConvParametreleriniCikar(float* ptr, ConvLayerParams* p, int giris
     uint64_t gereken = ((uint64_t)3 * 3 * giris_k * cikis_k) + 5 * cikis_k;
     uint64_t gereken_bayt = gereken * sizeof(float);
     if (*kapasite < gereken_bayt) return NULL;
+    // gereken_bayt truncation is safe due to the guard above
     *kapasite -= (uint32_t)gereken_bayt;
     p->w = ptr; ptr += (3 * 3 * giris_k * cikis_k);
     p->b = ptr; ptr += cikis_k;
@@ -335,6 +338,7 @@ static float* DenseParametreleriniCikar(float* ptr, DenseLayerParams* p, int in_
     uint64_t gereken = ((uint64_t)in_f * out_f) + 5 * out_f;
     uint64_t gereken_bayt = gereken * sizeof(float);
     if (*kapasite < gereken_bayt) return NULL;
+    // gereken_bayt truncation is safe due to the guard above
     *kapasite -= (uint32_t)gereken_bayt;
     p->w = ptr; ptr += (in_f * out_f);
     p->b = ptr; ptr += out_f;

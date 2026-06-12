@@ -51,6 +51,10 @@ begin
                     aes_state(r, c) <= (others => '0');
                 end loop;
             end loop;
+            lfsr_reg <= x"ACE10001";
+            noise_reg <= (others => '0');
+            stall_count <= "00";
+            free_running_counter <= x"1337BEEF";
         elsif rising_edge(clk) then
             free_running_counter <= free_running_counter + 1;
             lfsr_reg <= lfsr_reg(30 downto 0) & (lfsr_reg(31) xor lfsr_reg(21) xor lfsr_reg(1) xor lfsr_reg(0));

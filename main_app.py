@@ -49,7 +49,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
 
 class ConnectionManager:
@@ -75,28 +75,37 @@ class ConnectionManager:
             except Exception:
                 return conn
                 
-        results = await asyncio.gather(*(send_to_conn(conn) for conn in self.active_connections))
+        results = await asyncio.gather(*(send_to_conn(conn) for conn in list(self.active_connections)))
         
         for failed_conn in filter(None, results):
             self.disconnect(failed_conn)
 
 manager = ConnectionManager()
 running_tasks = {}
+_background_tasks = set()
 
 os.makedirs(os.path.join("static", "test_images"), exist_ok=True)
 app.mount("/static", StaticFiles(directory=os.path.join("static")), name="static")
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = None):
+async def websocket_endpoint(websocket: WebSocket):
     ws_token = os.environ.get("WEBSOCKET_TOKEN")
     if not ws_token:
         await websocket.close(code=1008, reason="Token not configured")
         return
-    if not token or not hmac.compare_digest(token, ws_token):
-        await websocket.close(code=1008, reason="Invalid token")
-        return
     await manager.connect(websocket)
     
+    try:
+        import json
+        auth_msg = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
+        auth_data = json.loads(auth_msg)
+        if auth_data.get("type") != "auth" or not hmac.compare_digest(auth_data.get("token", ""), ws_token):
+            raise Exception("Invalid auth")
+    except Exception:
+        manager.disconnect(websocket)
+        await websocket.close(code=1008, reason="Invalid token")
+        return
+
     last_msg_time = 0
     try:
         while True:
@@ -164,6 +173,8 @@ async def run_subprocess_and_broadcast(cmd: list, cwd: str, task_name: str, task
                     pass
 
         read_task = asyncio.create_task(read_stdout())
+        _background_tasks.add(read_task)
+        read_task.add_done_callback(_background_tasks.discard)
         try:
             timeout = max_timeout or int(os.environ.get("SUBPROCESS_TIMEOUT", "600"))
             await asyncio.wait_for(process.wait(), timeout=timeout)
@@ -201,13 +212,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return credentials.credentials
 
-@app.get("/api/config")
-async def get_config(token: str = Depends(verify_token)):
-    """Get WebSocket token for frontend"""
-    ws_token = os.environ.get("WEBSOCKET_TOKEN")
-    if not ws_token:
-        raise HTTPException(status_code=500, detail="WebSocket token not configured")
-    return {"ws_token": ws_token}
+
 
 @app.post("/api/train")
 async def start_training(params: TrainParams, token: str = Depends(verify_token)):
@@ -221,7 +226,9 @@ async def start_training(params: TrainParams, token: str = Depends(verify_token)
         params.encryption_mode.value,
         params.quant_mode.value
     ]
-    asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "AI Pipeline (Phase 1)", "phase1"))
+    task = asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "AI Pipeline (Phase 1)", "phase1"))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return {"message": "Egitim baslatildi"}
 
 @app.post("/api/simulate_hw")
@@ -229,6 +236,14 @@ async def start_hw_simulation(token: str = Depends(verify_token)):
     if "phase2" in running_tasks:
         return {"error": "Zaten calisiyor"}
     async def build_and_run_hw():
+        import hashlib
+        expected_hash = os.environ.get("COMPILE_PS1_HASH", "65EBA0F259DAF1FE76FB3C34B3B35D8644EBF8B2C4001A9C4709C174BCCB62FC").lower()
+        with open(os.path.join("donanim", "compile.ps1"), "rb") as f:
+            actual_hash = hashlib.sha256(f.read()).hexdigest().lower()
+        if actual_hash != expected_hash:
+            await manager.broadcast("\n[Donanım] HATA: Script butunluk kontrolu basarisiz!\n")
+            return
+            
         await manager.broadcast("\n[Donanım] VHDL kodları derleniyor ve testbench'ler calistiriliyor...\n")
         cmd = ["powershell.exe", "-ExecutionPolicy", "RemoteSigned", "-File", "compile.ps1"]
         await run_subprocess_and_broadcast(cmd, "donanim", "Donanım Simülasyonu (Faz 2)", "phase2_inner")
@@ -239,7 +254,9 @@ async def start_hw_simulation(token: str = Depends(verify_token)):
         if not task.cancelled() and task.exception():
             print(f"[HATA] Arka plan görevi çöktü: {task.exception()}")
     task = asyncio.create_task(build_and_run_hw())
+    _background_tasks.add(task)
     task.add_done_callback(cleanup)
+    task.add_done_callback(_background_tasks.discard)
     return {"message": "Donanim simulasyonu baslatildi"}
 
 @app.post("/api/simulate")
@@ -276,7 +293,12 @@ async def start_simulation(token: str = Depends(verify_token)):
                 except Exception:
                     pass
                     
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=120)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await manager.broadcast("\n[Simulasyon] Derleme zaman asimina ugradi!\n")
+                return
                 
             if proc.returncode != 0:
                 await manager.broadcast("\n[Simulasyon] Derleme hatasi!\n")
@@ -287,7 +309,9 @@ async def start_simulation(token: str = Depends(verify_token)):
             run_cmd = ["cyberpuf_sim.exe"]
             await run_subprocess_and_broadcast(run_cmd, "gomulu", "Gömülü Simülasyon (Phase 3)", "phase3_inner")
         except Exception as e:
-            await manager.broadcast(f"\n[Simulasyon] Beklenmeyen hata: {e}\n")
+            import logging
+            logging.exception("Simulation error")
+            await manager.broadcast("\n[Simulasyon] Beklenmeyen hata olustu. Lutfen loglari kontrol edin.\n")
 
     running_tasks["phase3"] = True
     def cleanup(task):
@@ -295,11 +319,13 @@ async def start_simulation(token: str = Depends(verify_token)):
         if not task.cancelled() and task.exception():
             print(f"[HATA] Arka plan görevi çöktü: {task.exception()}")
     task = asyncio.create_task(build_and_run())
+    _background_tasks.add(task)
     task.add_done_callback(cleanup)
+    task.add_done_callback(_background_tasks.discard)
     return {"message": "Simulasyon baslatildi"}
 
 @app.get("/api/test_images")
-async def get_test_images():
+async def get_test_images(token: str = Depends(verify_token)):
     test_images_dir = os.path.join("static", "test_images")
     if not os.path.exists(test_images_dir):
         return {"images": []}
@@ -314,7 +340,7 @@ _weight_viz_cache = {
 }
 
 @app.get("/api/weight_visuals")
-async def get_weight_visuals():
+async def get_weight_visuals(token: str = Depends(verify_token)):
     plaintext_path = os.path.join("output", "exported_weights", "cyberpuf_weights.bin")
     ciphertext_path = os.path.join("output", "encrypted_weights", "cyberpuf_ciphertext_raw.bin")
 

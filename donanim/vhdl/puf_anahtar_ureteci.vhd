@@ -73,6 +73,8 @@ architecture rtl of puf_anahtar_ureteci is
 
 begin
 
+    assert REPETITIONS <= 32 report "REPETITIONS 32'den buyuk olamaz!" severity failure;
+
     puf_inst: ro_puf_cekirdek
         generic map (
             RO_CIFT_SAYISI  => RO_CIFT_SAYISI,

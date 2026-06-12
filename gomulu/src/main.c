@@ -1,3 +1,6 @@
+#if defined(CYBERPUF_DEBUG) && defined(PRODUCTION_BUILD) 
+ #error "CYBERPUF_DEBUG must not be enabled in production builds!" 
+ #endif
 #include "xil_printf.h"
 #include <stdlib.h>
 #include <stdint.h>
@@ -81,6 +84,7 @@ void hmac_sha256_full(const uint8_t *key, size_t key_len, const uint8_t *aad, si
     guvenli_temizle(k_opad, 64);
     guvenli_temizle(tk, 32);
     guvenli_temizle(inner_hash, 32);
+    guvenli_temizle(&ctx, sizeof(SHA256_CTX));
 }
 
 void hmac_sha256(const uint8_t *key, size_t key_len, const uint8_t *nonce, size_t nonce_len, const uint8_t *data, size_t data_len, uint8_t *mac) {
@@ -133,6 +137,7 @@ void Sim_RegYaz(uint32_t adres, uint32_t data) {
 }
 
 uint32_t Sim_RegOku(uint32_t adres) {
+    if (adres < CYBERPUF_TABAN_ADRES) return 0;
     uint32_t ofset = adres - CYBERPUF_TABAN_ADRES;
     if (ofset <= 124) {
         return (sim_reg_alani[ofset]) | (sim_reg_alani[ofset+1] << 8) | (sim_reg_alani[ofset+2] << 16) | (sim_reg_alani[ofset+3] << 24);
@@ -360,24 +365,24 @@ void Execute_Inference_Flow(void) {
     }
 
     if (kdf_mode == 0x02) { // PBKDF2
-        xil_printf("      -> UYARI: HMAC anahtari PBKDF2 (600k iterasyon) ile uretilmis.\n");
-        xil_printf("      -> Bare-metal tarafta performans kisiti nedeniyle tam PBKDF2 HMAC dogrulamasi atlandi. Devam ediliyor...\n");
+        xil_printf("HATA: PBKDF2 modu bare-metal'de desteklenmiyor.\n"); guvenli_temizle(cozulmus_bellek, SIFRELI_VERI_BOYUTU); free(cozulmus_bellek); return;
     } else {
         uint8_t hesaplanan_mac[32];
         uint32_t aad_len = 8 + metadata_boyutu;
         hmac_sha256_full(gercek_anahtar_cikarim, 32, sifreli_agirliklar, aad_len, nonce, nonce_len, &sifreli_agirliklar[ciphertext_offset], ciphertext_size, hesaplanan_mac);
         
-        char hesaplanan_hmac_str[65];
+        uint8_t beklenen_mac_bytes[32];
         for (int i = 0; i < 32; i++) {
-            const char hex_chars[] = "0123456789abcdef";
-            hesaplanan_hmac_str[i*2] = hex_chars[(hesaplanan_mac[i] >> 4) & 0x0F];
-            hesaplanan_hmac_str[i*2+1] = hex_chars[hesaplanan_mac[i] & 0x0F];
+            char high_char = tolower((unsigned char)beklenen_hmac[i*2]);
+            char low_char = tolower((unsigned char)beklenen_hmac[i*2+1]);
+            uint8_t high = (high_char >= 'a' && high_char <= 'f') ? (high_char - 'a' + 10) : (high_char - '0');
+            uint8_t low = (low_char >= 'a' && low_char <= 'f') ? (low_char - 'a' + 10) : (low_char - '0');
+            beklenen_mac_bytes[i] = (high << 4) | low;
         }
-        hesaplanan_hmac_str[64] = '\0';
-        
+
         uint8_t diff = 0;
-        for (int i = 0; i < 64; i++) {
-            diff |= (hesaplanan_hmac_str[i] ^ tolower((unsigned char)beklenen_hmac[i]));
+        for (int i = 0; i < 32; i++) {
+            diff |= (hesaplanan_mac[i] ^ beklenen_mac_bytes[i]);
         }
         
         if (diff != 0) {
@@ -393,6 +398,12 @@ void Execute_Inference_Flow(void) {
     xil_printf("      -> Temizlenmis anahtar donanima (AXI-Lite) geri besleniyor...\n");
     CyberPUF_TemizAnahtarYaz(&cypher_inst, gercek_anahtar_cikarim);
 
+    if (ciphertext_size == 0 || ciphertext_size % 16 != 0) {
+        xil_printf("HATA: Sifreli veri boyutu 0 olamaz veya 16'nin kati degil.\n");
+        free(cozulmus_bellek);
+        return;
+    }
+
     if (!CyberPUF_TamponSifreCoz(
         &cypher_inst,
         &sifreli_agirliklar[ciphertext_offset],
@@ -405,12 +416,6 @@ void Execute_Inference_Flow(void) {
         return;
     }
     xil_printf("      -> Sifre cozme islemi tamamlandi.\n");
-    
-    if (ciphertext_size == 0) {
-        xil_printf("HATA: Sifreli veri boyutu 0 olamaz.\n");
-        free(cozulmus_bellek);
-        return;
-    }
     
     // PKCS7 Unpadding
     uint8_t pad_len = cozulmus_bellek[ciphertext_size - 1];
@@ -469,7 +474,7 @@ void Execute_Inference_Flow(void) {
     float en_yuksek_olasilik = 0.0f;
     for (int i = 0; i < 10; i++) {
         xil_printf("  Sinif %d: ", i);
-        int int_part = (int)(cikis_olasiliklari[i] * 10000);
+        float val = cikis_olasiliklari[i]; if (val < 0.0f) val = 0.0f; int int_part = (int)(val * 10000);
         xil_printf("%d.%04d\n", int_part / 10000, int_part % 10000);
         if (cikis_olasiliklari[i] > en_yuksek_olasilik) {
             en_yuksek_olasilik = cikis_olasiliklari[i];

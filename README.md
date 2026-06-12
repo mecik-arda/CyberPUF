@@ -45,14 +45,14 @@ python -m uvicorn main_app:app --host 127.0.0.1 --port 8000 --reload
 
 ---
 
-CyberPUF, uç cihazlarda (FPGA ve SoC mimarileri gibi) konuşlandırılan yapay sinir ağı ağırlıklarının fikri mülkiyetini (IP) korumak için tasarlanmış gelişmiş bir Donanım Güvenliği ve Gömülü Yapay Zeka projesidir. Model ağırlıklarının harici flash/RAM'de şifrelenmiş olarak saklanmasını ve yalnızca çalışma zamanında, silikon sınırları içinde Ring Oscillator Fiziksel Klonlanamaz Fonksiyonu (RO-PUF) tarafından üretilen donanıma özgü bir anahtar kullanılarak deşifre edilmesini sağlar.
+CyberPUF, uç cihazlarda (FPGA ve SoC mimarileri gibi) konuşlandırılan yapay sinir ağı ağırlıklarının fikri mülkiyetini (IP) korumak için tasarlanmış bir Donanım Güvenliği ve Gömülü Yapay Zeka projesidir. Model ağırlıklarının harici flash/RAM'de şifrelenmiş olarak saklanmasını ve yalnızca çalışma zamanında, silikon sınırları içinde Ring Oscillator Fiziksel Klonlanamaz Fonksiyonu (RO-PUF) tarafından üretilen donanıma özgü bir anahtar kullanılarak deşifre edilmesini sağlar.
 
-### 🖥️ CyberPUF Web Dashboard (Yeni!)
+### 🖥️ CyberPUF Web Dashboard
 
-Sistemin uçtan uca kontrolü ve görselleştirilmesi için geliştirilmiş modern, asenkron ve siberpunk temalı web arayüzü:
+Sistemin uçtan uca kontrolü ve görselleştirilmesi için geliştirilmiş modern web arayüzü:
 - **Dinamik Görev Konsolları:** Her işlem (Eğitim, Donanım Sentezi, Simülasyon) için dinamik olarak açılan ve kapatılabilen yan yana WebSocket konsolları.
-- **Canlı Sistem Logları:** `asyncio.gather` destekli, darboğazsız asenkron WebSocket yayını.
-- **Güvenlik Mimarisi:** API Rotalarında Statik Bearer tabanlı kimlik doğrulama, `hmac.compare_digest` ile Zamanlama Saldırısı (Timing Attack) koruması, CSRF denetimleri ve tam izolasyon.
+- **Canlı Sistem Logları:** `asyncio.gather` destekli, asenkron WebSocket yayını.
+- **Güvenlik Mimarisi:** API Rotalarında Bearer tabanlı kimlik doğrulama, Zamanlama Saldırısı (Timing Attack) koruması, CSRF denetimleri ve tam izolasyon.
 - **Gizlilik:** Loglarda kullanıcının bilgisayarındaki asıl dosya yollarının maskelenmesi (Path Masking).
 - **Ağırlık Görselleştirici (Weight Viz):** Şifrelenmiş anlamsız ağırlıkların, şifrelenmeden önceki (çözülmüş) haliyle arasındaki farkın piksel piksel ekranda gösterilmesi.
 
@@ -164,7 +164,7 @@ python run_phase1.py 1 128 0.001 CBC
 Not: Bilgisayarınızda `ghdl` yüklü ve PATH'e eklenmiş olmalıdır.
 ```powershell
 cd donanim
-.\compile.ps1
+powershell.exe -ExecutionPolicy Bypass -File compile.ps1
 ```
 
 **4. Faz 3'ü Çalıştırma (Gömülü C Simülasyonu)**
@@ -325,7 +325,7 @@ python run_phase1.py 1 128 0.001 CBC
 Note: Make sure `ghdl` is installed and added to your system PATH.
 ```powershell
 cd donanim
-.\compile.ps1
+powershell.exe -ExecutionPolicy Bypass -File compile.ps1
 ```
 
 **4. Running Phase 3 (Embedded C Simulation)**

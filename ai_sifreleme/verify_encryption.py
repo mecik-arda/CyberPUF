@@ -67,8 +67,20 @@ def parse_encrypted_binary(file_path):
     metadata = json.loads(metadata_json)
     offset += metadata_length
 
-    aad_bytes = data[:offset]
+    verify_metadata = {k: v for k, v in metadata.items() if k != 'ciphertext_hmac'}
+    verify_metadata_json = json.dumps(verify_metadata).encode('utf-8')
 
+    aad_output = bytearray()
+    aad_output.extend(magic)
+    aad_output.extend(struct.pack('<B', version_major))
+    aad_output.extend(struct.pack('<B', version_minor))
+    aad_output.extend(struct.pack('<B', mode_byte))
+    aad_output.extend(struct.pack('<B', kdf_mode_byte))
+    aad_output.extend(struct.pack('<I', len(verify_metadata_json)))
+    aad_output.extend(verify_metadata_json)
+    aad_bytes = bytes(aad_output)
+
+    hmac_bytes = b''
     if encryption_mode == 'GCM' or encryption_mode == 'CBC':
         nonce_length = struct.unpack('<B', data[offset:offset + 1])[0]
         offset += 1
@@ -110,6 +122,7 @@ def parse_encrypted_binary(file_path):
         'metadata': metadata,
         'nonce': nonce,
         'auth_tag': auth_tag,
+        'file_hmac_bytes': hmac_bytes,
         'ciphertext': ciphertext,
         'aad_bytes': aad_bytes,
         'total_file_size': len(data),
@@ -130,7 +143,7 @@ def decrypt_data(ciphertext, nonce, auth_tag, aes_key, raw_puf_key, mode='GCM', 
         import hmac
         import hashlib
         import json
-        if not expected_hmac:
+        if expected_hmac is None:
             raise ValueError("HMAC verification failed! Expected HMAC is missing in CBC mode.")
             
         if metadata.get('mac_mode', 'direct') == 'pbkdf2':
@@ -140,7 +153,7 @@ def decrypt_data(ciphertext, nonce, auth_tag, aes_key, raw_puf_key, mode='GCM', 
             mac_salt = bytes.fromhex(mac_salt_hex)
             mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
         else:
-            mac_key = raw_puf_key
+            mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, b'mac-key-derivation', 600000, dklen=32)
         
         h = hmac.new(mac_key, digestmod=hashlib.sha256)
         h.update(aad)
@@ -346,7 +359,7 @@ def verify_encryption():
         raw_puf_key = get_puf_key()
         salt = bytes.fromhex(parsed['metadata']['salt_hex'])
         aes_key, _ = derive_key_from_puf_simulation(raw_puf_key, salt)
-        print(f"  AES Anahtari (hex): {aes_key.hex()[:4]}***{aes_key.hex()[-4:]}")
+        print(f"  Anahtar parmak izi: {hashlib.sha256(aes_key).hexdigest()[:16]}...")
 
         decrypted_data = decrypt_data(
             parsed['ciphertext'],

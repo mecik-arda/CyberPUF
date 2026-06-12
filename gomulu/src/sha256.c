@@ -61,7 +61,7 @@ static void sha256_transform(SHA256_CTX *ctx, const uint8_t data[]) {
     ctx->state[6] += g;
     ctx->state[7] += h;
     
-    memset(m, 0, sizeof(m));
+    volatile uint8_t* p = (volatile uint8_t*)m; for (size_t i = 0; i < sizeof(m); i++) p[i] = 0;
 }
 
 void sha256_init(SHA256_CTX *ctx) {
@@ -130,4 +130,7 @@ void sha256_final(SHA256_CTX *ctx, uint8_t hash[]) {
         hash[i + 24] = (ctx->state[6] >> (24 - i * 8)) & 0x000000ff;
         hash[i + 28] = (ctx->state[7] >> (24 - i * 8)) & 0x000000ff;
     }
+    
+    // Clear context to prevent state leakage in stack
+    memset(ctx, 0, sizeof(SHA256_CTX));
 }

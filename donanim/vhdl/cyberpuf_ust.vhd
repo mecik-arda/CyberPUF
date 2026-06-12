@@ -9,7 +9,8 @@ entity cyberpuf_ust is
         INVERTER_SAYISI    : integer := 3;
         SAYICI_GENISLIGI    : integer := 20;
         SAYMA_DONGULERI     : integer := 1000;
-        PUF_TEKRARLARI  : integer := 15
+        PUF_TEKRARLARI  : integer := 15;
+        DEBUG_ENABLE    : boolean := true
     );
     port (
         clk                 : in  std_logic;
@@ -202,11 +203,21 @@ begin
             busy            => aes_enc_mesgul
         );
 
-    hata_ayiklama_bit_indeks <= puf_bit_indeks;
-    hata_ayiklama_sayac_a <= puf_ha_sayac_a;
-    hata_ayiklama_sayac_b <= puf_ha_sayac_b;
     durum_anahtar_hazir <= anahtarlar_hazir;
-    puf_anahtar_cikis <= puf_anahtar;
+
+    debug_out_gen: if DEBUG_ENABLE generate
+        hata_ayiklama_bit_indeks <= puf_bit_indeks;
+        hata_ayiklama_sayac_a <= puf_ha_sayac_a;
+        hata_ayiklama_sayac_b <= puf_ha_sayac_b;
+        puf_anahtar_cikis <= puf_anahtar;
+    end generate debug_out_gen;
+
+    no_debug_out_gen: if not DEBUG_ENABLE generate
+        hata_ayiklama_bit_indeks <= (others => '0');
+        hata_ayiklama_sayac_a <= (others => '0');
+        hata_ayiklama_sayac_b <= (others => '0');
+        puf_anahtar_cikis <= (others => '0');
+    end generate no_debug_out_gen;
 
     process(clk, rst)
     begin

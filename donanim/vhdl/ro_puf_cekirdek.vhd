@@ -192,7 +192,7 @@ begin
 
                 when WAIT_SYNC =>
                     ref_counter <= ref_counter + 1;
-                    if ref_counter = to_unsigned(15, SAYICI_GENISLIGI) then
+                    if ref_counter = to_unsigned(31, SAYICI_GENISLIGI) then
                         ro_aktif <= (others => '0'); -- Now it's safe to turn off RO
                         state <= COMPARE;
                     end if;

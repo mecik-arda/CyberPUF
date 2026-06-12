@@ -215,7 +215,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='di
     raw_puf_key = get_puf_key()
     aes_key, salt = derive_key_from_puf_simulation(raw_puf_key)
     print(f"  Anahtar uzunlugu : {len(aes_key) * 8} bit")
-    print(f"  Anahtar (hex)    : {aes_key.hex()[:4]}***{aes_key.hex()[-4:]}")
+    print(f"  Anahtar parmak izi: {hashlib.sha256(aes_key).hexdigest()[:16]}...")
     print(f"  Not: Bu anahtar ortam degiskeninden (veya fallback) alindi.")
 
 
@@ -283,7 +283,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='di
     if mac_mode == 'pbkdf2':
         mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
     else:
-        mac_key = raw_puf_key
+        mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, b'mac-key-derivation', 600000, dklen=32)
     
     # Encrypt-then-MAC
     h = hmac.new(mac_key, digestmod=hashlib.sha256)
@@ -448,6 +448,10 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='di
     print("FAZ 1 - ADIM 3 TAMAMLANDI: Agirliklar sifrelendi.")
     print("Sonraki adim: verify_encryption.py ile uctan uca dogrulama yapin.")
     print("=" * 70)
+
+    # Bellek Guvenligi Icin Oneri: Islem bittikten sonra ctypes.memset ile aes_key bellekten silinmelidir.
+    import ctypes
+    # ctypes.memset(id(aes_key) + 33, 0, len(aes_key)) # Python bellek yonetimi yuzunden dikkatli kullanilmalidir
 
     return encrypted_binary, aes_key, nonce, auth_tag
 

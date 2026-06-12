@@ -139,7 +139,8 @@ architecture rtl of axi4_lite_sarmalayici is
             INVERTER_SAYISI    : integer := 3;
             SAYICI_GENISLIGI    : integer := 20;
             SAYMA_DONGULERI     : integer := 1000;
-            PUF_TEKRARLARI  : integer := 15
+            PUF_TEKRARLARI  : integer := 15;
+            DEBUG_ENABLE    : boolean := true
         );
         port (
             clk                 : in  std_logic;
@@ -178,7 +179,8 @@ begin
             INVERTER_SAYISI   => INVERTER_SAYISI,
             SAYICI_GENISLIGI   => SAYICI_GENISLIGI,
             SAYMA_DONGULERI    => SAYMA_DONGULERI,
-            PUF_TEKRARLARI => PUF_TEKRARLARI
+            PUF_TEKRARLARI => PUF_TEKRARLARI,
+            DEBUG_ENABLE => DEBUG_ENABLE
         )
         port map (
             clk                 => S_AXI_ACLK,
@@ -207,7 +209,7 @@ begin
             if rst_internal = '1' then
                 cmd_generate_key_r <= '0';
                 cmd_start_decrypt_r <= '0';
-                cmd_load_clean_key_r <= '0';
+                cmd_start_encrypt_r <= '0';
             else
                 cmd_generate_key_r <= reg_control(0);
                 cmd_start_decrypt_r <= reg_control(1);
@@ -340,14 +342,27 @@ begin
     reg_data_out_2 <= core_data_out(95 downto 64);
     reg_data_out_3 <= core_data_out(127 downto 96);
 
-    reg_puf_key_0 <= core_puf_key(31 downto 0);
-    reg_puf_key_1 <= core_puf_key(63 downto 32);
-    reg_puf_key_2 <= core_puf_key(95 downto 64);
-    reg_puf_key_3 <= core_puf_key(127 downto 96);
-    reg_puf_key_4 <= core_puf_key(159 downto 128);
-    reg_puf_key_5 <= core_puf_key(191 downto 160);
-    reg_puf_key_6 <= core_puf_key(223 downto 192);
-    reg_puf_key_7 <= core_puf_key(255 downto 224);
+    debug_key_gen: if DEBUG_ENABLE generate
+        reg_puf_key_0 <= core_puf_key(31 downto 0);
+        reg_puf_key_1 <= core_puf_key(63 downto 32);
+        reg_puf_key_2 <= core_puf_key(95 downto 64);
+        reg_puf_key_3 <= core_puf_key(127 downto 96);
+        reg_puf_key_4 <= core_puf_key(159 downto 128);
+        reg_puf_key_5 <= core_puf_key(191 downto 160);
+        reg_puf_key_6 <= core_puf_key(223 downto 192);
+        reg_puf_key_7 <= core_puf_key(255 downto 224);
+    end generate debug_key_gen;
+
+    no_debug_key_gen: if not DEBUG_ENABLE generate
+        reg_puf_key_0 <= (others => '0');
+        reg_puf_key_1 <= (others => '0');
+        reg_puf_key_2 <= (others => '0');
+        reg_puf_key_3 <= (others => '0');
+        reg_puf_key_4 <= (others => '0');
+        reg_puf_key_5 <= (others => '0');
+        reg_puf_key_6 <= (others => '0');
+        reg_puf_key_7 <= (others => '0');
+    end generate no_debug_key_gen;
 
     debug_gen: if DEBUG_ENABLE generate
         reg_debug_0(SAYICI_GENISLIGI - 1 downto 0) <= core_count_a;

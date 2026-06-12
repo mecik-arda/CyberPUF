@@ -40,15 +40,17 @@ architecture sim of tb_cyberpuf_ust is
             rst                 : in  std_logic;
             komut_anahtar_uret    : in  std_logic;
             komut_sifre_coz_basla   : in  std_logic;
+            komut_sifrele_basla     : in  std_logic;
             veri_giris             : in  std_logic_vector(127 downto 0);
             veri_cikis            : out std_logic_vector(127 downto 0);
+            durum_anahtar_hazir    : out std_logic;
             durum_puf_mesgul     : out std_logic;
             durum_puf_tamam     : out std_logic;
             durum_anahtar_gen_mesgul : out std_logic;
             durum_anahtar_gen_tamam : out std_logic;
             durum_aes_mesgul     : out std_logic;
             durum_aes_tamam     : out std_logic;
-            hata_ayiklama_puf_anahtar       : out std_logic_vector(255 downto 0);
+            puf_anahtar_cikis       : out std_logic_vector(255 downto 0);
             hata_ayiklama_bit_indeks     : out std_logic_vector(8 downto 0);
             hata_ayiklama_sayac_a       : out std_logic_vector(19 downto 0);
             hata_ayiklama_sayac_b       : out std_logic_vector(19 downto 0)
@@ -72,15 +74,17 @@ begin
             rst                 => rst,
             komut_anahtar_uret    => komut_anahtar_uret,
             komut_sifre_coz_basla   => komut_sifre_coz_basla,
+            komut_sifrele_basla     => '0',
             veri_giris             => veri_giris,
             veri_cikis            => veri_cikis,
+            durum_anahtar_hazir    => open,
             durum_puf_mesgul     => durum_puf_mesgul,
             durum_puf_tamam     => durum_puf_tamam,
             durum_anahtar_gen_mesgul => durum_anahtar_gen_mesgul,
             durum_anahtar_gen_tamam => durum_anahtar_gen_tamam,
             durum_aes_mesgul     => durum_aes_mesgul,
             durum_aes_tamam     => durum_aes_tamam,
-            hata_ayiklama_puf_anahtar       => hata_ayiklama_puf_anahtar,
+            puf_anahtar_cikis       => hata_ayiklama_puf_anahtar,
             hata_ayiklama_bit_indeks     => hata_ayiklama_bit_indeks,
             hata_ayiklama_sayac_a       => hata_ayiklama_sayac_a,
             hata_ayiklama_sayac_b       => hata_ayiklama_sayac_b

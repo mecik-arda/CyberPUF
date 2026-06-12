@@ -66,9 +66,12 @@ void FuzzyExtractor_Kayit(const uint8_t* puf_ham_anahtar, YardimciVeri* yardimci
     XTime t;
     XTime_GetTime(&t);
     
-    uint8_t seed_buf[sizeof(XTime) + PUF_ANAHTAR_BOYUTU];
+    uint32_t simulated_trng = rand() ^ 0xCAFEBABE;
+    
+    uint8_t seed_buf[sizeof(XTime) + PUF_ANAHTAR_BOYUTU + sizeof(uint32_t)];
     memcpy(seed_buf, &t, sizeof(XTime));
     memcpy(seed_buf + sizeof(XTime), puf_ham_anahtar, PUF_ANAHTAR_BOYUTU);
+    memcpy(seed_buf + sizeof(XTime) + PUF_ANAHTAR_BOYUTU, &simulated_trng, sizeof(uint32_t));
 
     SHA256_CTX ctx;
     sha256_init(&ctx);

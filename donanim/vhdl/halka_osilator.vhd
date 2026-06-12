@@ -28,6 +28,8 @@ architecture rtl of halka_osilator is
 
 begin
 
+    assert (INVERTER_SAYISI mod 2 = 1) report "INVERTER_SAYISI tek sayi olmalidir!" severity failure;
+
     chain(0) <= not chain(INVERTER_SAYISI - 1) after 1 ns when enable = '1' else '0';
 
     gen_inverters: for i in 1 to INVERTER_SAYISI - 1 generate

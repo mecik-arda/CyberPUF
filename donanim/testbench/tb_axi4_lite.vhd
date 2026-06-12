@@ -70,7 +70,15 @@ architecture sim of tb_axi4_lite is
             S_AXI_RDATA    : out std_logic_vector(C_S_AXI_DATA_WIDTH - 1 downto 0);
             S_AXI_RRESP    : out std_logic_vector(1 downto 0);
             S_AXI_RVALID   : out std_logic;
-            S_AXI_RREADY   : in  std_logic
+            S_AXI_RREADY   : in  std_logic;
+            S_AXIS_TDATA   : in  std_logic_vector(31 downto 0) := (others => '0');
+            S_AXIS_TVALID  : in  std_logic := '0';
+            S_AXIS_TREADY  : out std_logic;
+            S_AXIS_TLAST   : in  std_logic := '0';
+            M_AXIS_TDATA   : out std_logic_vector(31 downto 0);
+            M_AXIS_TVALID  : out std_logic;
+            M_AXIS_TREADY  : in  std_logic := '0';
+            M_AXIS_TLAST   : out std_logic
         );
     end component;
 
