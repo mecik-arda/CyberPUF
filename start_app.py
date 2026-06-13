@@ -18,7 +18,7 @@ def main():
     
     # Load environment variables from .env
     load_dotenv()
-    print("[✓] .env dosyası yüklendi")
+    print("[OK] .env dosyasi yuklendi")
     
     # Verify required variables
     required_vars = ['CYBERPUF_AES_KEY', 'WEBSOCKET_TOKEN', 'APP_HOST', 'APP_PORT']
@@ -28,12 +28,12 @@ def main():
         if not os.environ.get(var):
             missing.append(var)
         else:
-            print(f"[✓] {var} = {os.environ.get(var)[:20]}...")
+            print(f"[OK] {var} = {os.environ.get(var)[:20]}...")
     
     if missing:
         print()
-        print(f"❌ HATA: Eksik environment variables: {', '.join(missing)}")
-        print("Lütfen .env dosyasını kontrol edin.")
+        print(f"[HATA] Eksik environment variables: {', '.join(missing)}")
+        print("[HATA] .env dosyasi bulunamadi! Lutfen .env.example'i kopyalayip .env olusturun.")
         input("Devam etmek için herhangi bir tuşa basın...")
         sys.exit(1)
     
@@ -63,7 +63,7 @@ def main():
     threading.Thread(target=open_browser_when_ready, args=(host, port, url), daemon=True).start()
     
     # Start Uvicorn
-    print("[✓] Uvicorn başlatılıyor...")
+    print("[OK] python bagimliliklari tam.")
     print("=" * 60)
     print()
     

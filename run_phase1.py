@@ -8,7 +8,7 @@ load_dotenv()
 
 def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='CBC', quant_mode='int8_weight', mac_mode='direct'):
     print("=" * 70)
-    print("CyberPUF - Faz 1: Tam Pipeline Calistirma")
+    print("CyberPUF v3.3.0-Final - Faz 1: Tam Pipeline Calistirma")
     print("Gelistirici: Arda Mecik")
     print("=" * 70)
     print(f"  Epoch sayisi       : {epoch_sayisi}")

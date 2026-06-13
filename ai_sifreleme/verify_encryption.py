@@ -73,11 +73,6 @@ def parse_encrypted_binary(file_path):
     aad_output.extend(struct.pack('<B', version_minor))
     aad_output.extend(struct.pack('<B', mode_byte))
     aad_output.extend(struct.pack('<B', kdf_mode_byte))
-    aad_output.extend(struct.pack('<Q', metadata['plaintext_size']))
-    aad_output.extend(bytes.fromhex(metadata['plaintext_sha256']))
-    aad_output.extend(bytes.fromhex(metadata['salt_hex']))
-    if 'mac_salt_hex' in metadata:
-        aad_output.extend(bytes.fromhex(metadata['mac_salt_hex']))
     aad_bytes = bytes(aad_output)
 
     hmac_bytes = b''
@@ -153,7 +148,7 @@ def decrypt_data(ciphertext, nonce, auth_tag, aes_key, raw_puf_key, mode='GCM', 
             mac_salt = bytes.fromhex(mac_salt_hex)
             mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
         else:
-            mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, b'mac-key-derivation', 600000, dklen=32)
+            mac_key = raw_puf_key
         
         h = hmac.new(mac_key, digestmod=hashlib.sha256)
         h.update(aad)

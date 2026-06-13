@@ -259,11 +259,6 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='di
     else:
         aad_output.extend(struct.pack('<B', 0x00))
     
-    aad_output.extend(struct.pack('<Q', encryption_metadata['plaintext_size']))
-    aad_output.extend(bytes.fromhex(encryption_metadata['plaintext_sha256']))
-    aad_output.extend(bytes.fromhex(encryption_metadata['salt_hex']))
-    if encryption_metadata.get('mac_salt_hex'):
-        aad_output.extend(bytes.fromhex(encryption_metadata['mac_salt_hex']))
     aad_bytes = bytes(aad_output)
 
     if encryption_mode == 'GCM':
@@ -281,7 +276,7 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='di
     if mac_mode == 'pbkdf2':
         mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, mac_salt, 600000, dklen=32)
     else:
-        mac_key = hashlib.pbkdf2_hmac('sha256', raw_puf_key, b'mac-key-derivation', 600000, dklen=32)
+        mac_key = raw_puf_key
     
     # Encrypt-then-MAC
     h = hmac.new(mac_key, digestmod=hashlib.sha256)

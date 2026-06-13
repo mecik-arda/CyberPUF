@@ -9,7 +9,7 @@
 ## Türkçe
 
 **Geliştirici:** Arda Meçik (AltaySec bünyesinde geliştirilmiştir)
-**Sürüm:** v3.2.0-Core (Donanım Hızlandırma & Güvenlik Yamaları)
+**Sürüm:** v3.3.0-Final (KDF Senkronizasyonu & API Güvenliği Yamaları)
 **Lisans:** MIT
 
 ### 🚀 Hızlı Başlangıç (Quick Start)
@@ -80,16 +80,16 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 - **Yardımcı Veri Üretici (Fuzzy Extractor):** PUF anahtarındaki sıcaklık/voltaj kaynaklı bit hatalarını (gürültüyü) silikon dışında Code-Offset ve Hamming(7,4) Hata Düzeltme Kodları (ECC) ile teorik hata düzeltme kapasitesi sunarak onaran akıllı hata ayıklama modülü (`yardimci_veri_uretici.c`). Global Timer üzerinden (XTime_GetTime) tam rastgele tohumlanır.
 - **Bare-Metal CNN Motoru:** Hiçbir harici kütüphane kullanılmadan C dilinde sıfırdan yazılmış yapay zeka çıkarım motoru. RAM parçalanmasını en aza indirmek için ping-pong bellek tekniği kullanarak Conv2D (Cache-friendly Loop), MaxPool, Dense ve BatchNorm+ReLU katmanlarını destekler.
 
-#### Kriptografik Bütünlük ve HMAC/KDF Seçenekleri
+### Kriptografik Bütünlük ve HMAC/KDF Seçenekleri
 Sistem, şifrelenmiş model ağırlıklarının bütünlüğünü (Integrity) ve kurcalama korumasını (Tamper Resistance) doğrulamak için iki farklı mod sunar:
-1. **Doğrudan (Direct) HMAC Modu:**
-   - **Çalışma Prensibi:** RO-PUF'tan üretilen donanım anahtarı, şifreli verilerin bütünlüğünü denetlemek için doğrudan HMAC-SHA256 anahtarı olarak kullanılır.
+1. **Doğrudan (Direct) HMAC Modu (Varsayılan):**
+   - **Çalışma Prensibi:** RO-PUF'tan üretilen donanım anahtarı, şifreli verilerin bütünlüğünü denetlemek için doğrudan HMAC-SHA256 anahtarı olarak kullanılır. Python ve Gömülü C tam senkronizasyon ile (Raw 8-byte AAD üzerinden) çalışır.
    - **Avantajı:** Bare-metal gömülü tarafta (C) neredeyse sıfır gecikme (latency) ile çalışır ve son derece yüksek performans sağlar.
    - **Kullanım Senaryosu:** İşlem gücü ve kaynakları çok sınırlı olan gömülü uç cihazlar.
 2. **PBKDF2-HMAC Modu:**
    - **Çalışma Prensibi:** Donanım anahtarı, 600,000 iterasyonluk PBKDF2-HMAC-SHA256 esnetme işleminden geçirilerek türetilmiş bir HMAC anahtarı üretilir.
    - **Avantajı:** Çok yüksek kriptografik direnç sağlar ve ham PUF anahtarının doğrudan kullanımını engeller.
-   - **Sınırlama:** Donanım ivmelendirici bulunmayan bare-metal işlemcilerde PBKDF2 işlemini yazılımsal olarak koşturmak çok uzun zaman aldığından, gömülü C simülasyonunda bu mod algılandığında güvenlik uyarısı verilerek doğrulama aşaması bypass edilir.
+   - **Sınırlama:** Donanım ivmelendirici bulunmayan bare-metal işlemcilerde PBKDF2 işlemini yazılımsal olarak koşturmak çok uzun zaman aldığından, gömülü C tarafında desteklenmez. Yalnızca salt-yazılım (yüksek kaynaklı uç birim) projelerinde kullanılır.
 
 ### Test Sonuçları (Donanım AES-256 Crypto Core)
 GHDL simülasyonu ile donanımın şifre çözme performansı ve doğruluğu başarıyla test edilmiştir. Aşağıda VHDL Testbench'inin doğrudan çıktısı bulunmaktadır:

@@ -368,7 +368,7 @@ void Execute_Inference_Flow(void) {
         xil_printf("HATA: PBKDF2 modu bare-metal'de desteklenmiyor.\n"); guvenli_temizle(cozulmus_bellek, SIFRELI_VERI_BOYUTU); free(cozulmus_bellek); return;
     } else {
         uint8_t hesaplanan_mac[32];
-        uint32_t aad_len = 8 + metadata_boyutu;
+        uint32_t aad_len = 8;
         hmac_sha256_full(gercek_anahtar_cikarim, 32, sifreli_agirliklar, aad_len, nonce, nonce_len, &sifreli_agirliklar[ciphertext_offset], ciphertext_size, hesaplanan_mac);
         
         uint8_t beklenen_mac_bytes[32];
