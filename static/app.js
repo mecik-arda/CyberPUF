@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const helpBtn = document.getElementById('help-btn');
     const helpModal = document.getElementById('help-modal');
     const closeModalBtn = document.getElementById('close-modal-btn');
+    const authModal = document.getElementById('auth-modal');
+    const authTokenInput = document.getElementById('auth-token-input');
+    const authSubmitBtn = document.getElementById('auth-submit-btn');
 
     // Terminal Logging
     const MAX_TERMINAL_LINES = 1000;
@@ -112,19 +115,46 @@ document.addEventListener('DOMContentLoaded', () => {
     let wsReconnectDelay = 1000;
     const MAX_RECONNECT_DELAY = 30000;
     let cachedWsToken = null;
+    let authPromiseResolver = null;
 
     async function getWebSocketToken() {
         if (cachedWsToken) {
             return cachedWsToken;
         }
         
-        let token = prompt("Lütfen API Token giriniz (örn. dev_cyberpuf_token_12345):");
-        if (!token) {
-            throw new Error("Token girilmedi.");
-        }
+        authModal.classList.remove('hidden');
         
-        cachedWsToken = token;
-        return cachedWsToken;
+        return new Promise((resolve) => {
+            authPromiseResolver = resolve;
+        });
+    }
+
+    authSubmitBtn.addEventListener('click', () => {
+        const token = authTokenInput.value.trim();
+        if (token) {
+            cachedWsToken = token;
+            authModal.classList.add('hidden');
+            if (authPromiseResolver) {
+                authPromiseResolver(token);
+                authPromiseResolver = null;
+            }
+        }
+    });
+
+    async function fetchAPI(endpoint, options = {}) {
+        const token = await getWebSocketToken();
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(options.headers || {})
+        };
+        const config = {
+            ...options,
+            headers
+        };
+        const res = await fetch(endpoint, config);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
     }
 
     async function connectWebSocket() {
@@ -183,13 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch Test Images
     async function loadTestImages() {
         try {
-            const token = await getWsToken();
-            const res = await fetch('/api/test_images', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const res = await fetchAPI('/api/test_images');
             const data = await res.json();
             imageSelect.innerHTML = '<option value="">-- Bir Görsel Seçin --</option>';
             data.images.forEach(img => {
@@ -238,16 +262,13 @@ document.addEventListener('DOMContentLoaded', () => {
         trainSpinner.classList.remove('hidden');
 
         try {
-            const res = await fetch('/api/train', {
+            await fetchAPI('/api/train', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Authorization': `Bearer ${cachedWsToken}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(payload)
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             logToTerminal('[Sistem] Eğitim komutu sunucuya iletildi.', 'info');
         } catch(err) {
             logToTerminal(`[Hata] Eğitim başlatılamadı: ${err.message}`, 'error');
@@ -268,14 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pufStatus.style.color = '';
 
         try {
-            const res = await fetch('/api/simulate', { 
-                method: 'POST',
-                headers: { 
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Authorization': `Bearer ${cachedWsToken}`
-                }
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            await fetchAPI('/api/simulate', { method: 'POST' });
             logToTerminal('[Sistem] Simülasyon komutu sunucuya iletildi.', 'info');
         } catch(err) {
             logToTerminal(`[Hata] Simülasyon başlatılamadı: ${err.message}`, 'error');
@@ -292,14 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hwSimSpinner.classList.remove('hidden');
             
             try {
-                const res = await fetch('/api/simulate_hw', { 
-                    method: 'POST',
-                    headers: { 
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Authorization': `Bearer ${cachedWsToken}`
-                    }
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                await fetchAPI('/api/simulate_hw', { method: 'POST' });
                 logToTerminal('[Sistem] Donanım simülasyon komutu sunucuya iletildi.', 'info');
             } catch(err) {
                 logToTerminal(`[Hata] Donanım simülasyonu başlatılamadı: ${err.message}`, 'error');
@@ -350,12 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
         vizError.classList.add('hidden');
         
         try {
-            const res = await fetch('/api/weight_visuals', {
-                headers: {
-                    'Authorization': `Bearer ${cachedWsToken}`
-                }
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const res = await fetchAPI('/api/weight_visuals');
             const data = await res.json();
             
             if (data.error) {

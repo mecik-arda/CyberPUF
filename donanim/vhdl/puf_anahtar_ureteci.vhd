@@ -51,6 +51,12 @@ architecture rtl of puf_anahtar_ureteci is
 
     signal accumulated_bit : unsigned(4 downto 0);
 
+    type helper_data_array is array(0 to KEY_WIDTH - 1) of std_logic;
+    -- Ornek Helper Data ROM (Pratikte enrollment sirasinda belirlenir)
+    constant HELPER_DATA_ROM : helper_data_array := (
+        others => '0' 
+    );
+
     component ro_puf_cekirdek is
         generic (
             RO_CIFT_SAYISI     : integer := 256;
@@ -156,7 +162,8 @@ begin
                         majority_result := '0';
                     end if;
 
-                    key_reg(KEY_WIDTH - 1 - to_integer(bit_counter)) <= majority_result;
+                    -- Fuzzy Extractor: Repetition Code Decode + Helper Data XOR
+                    key_reg(KEY_WIDTH - 1 - to_integer(bit_counter)) <= majority_result xor HELPER_DATA_ROM(to_integer(bit_counter));
 
                     accumulated_bit <= (others => '0');
                     rep_counter <= (others => '0');

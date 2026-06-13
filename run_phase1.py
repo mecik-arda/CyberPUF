@@ -1,6 +1,9 @@
 import os
 import sys
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def run_full_pipeline(epoch_sayisi=50, yigin_boyutu=128, ogrenme_orani=0.001, sifreleme_modu='CBC', quant_mode='int8_weight', mac_mode='direct'):

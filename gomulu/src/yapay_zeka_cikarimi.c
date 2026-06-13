@@ -14,35 +14,53 @@ static float tampon1[MAKS_TAMPON_BOYUTU];
 static float tampon2[MAKS_TAMPON_BOYUTU];
 
 void Conv2D_3x3_Same(const float* giris, float* cikis, const ConvLayerParams* params, int giris_y, int giris_g, int giris_k, int cikis_k) {
+    int out_pixels = giris_y * giris_g;
+    int kernel_size = 9 * giris_k;
+    
+    // Allocate im2col buffer
+    float* im2col_buf = (float*)malloc(out_pixels * kernel_size * sizeof(float));
+    if (!im2col_buf) {
+        xil_printf("HATA: im2col_buf icin bellek yetersiz.\n");
+        return;
+    }
+    
+    // im2col step
     for (int h = 0; h < giris_y; h++) {
         for (int w = 0; w < giris_g; w++) {
-            int out_idx = (h * giris_g + w) * cikis_k;
-            int cy_start = (h > 0) ? -1 : 0;
-            int cy_end = (h < giris_y - 1) ? 1 : 0;
-            int cg_start = (w > 0) ? -1 : 0;
-            int cg_end = (w < giris_g - 1) ? 1 : 0;
-            
-            for (int ck = 0; ck < cikis_k; ck++) {
-                cikis[out_idx + ck] = params->b[ck];
-            }
-            for (int cy = cy_start; cy <= cy_end; cy++) {
-                int r = h + cy;
-                for (int cg = cg_start; cg <= cg_end; cg++) {
-                    int c = w + cg;
-                    int cy_idx = (cy + 1) * 3 + (cg + 1);
-                    int w_offset = cy_idx * giris_k * cikis_k;
-                    int g_base = (r * giris_g + c) * giris_k;
-                    for (int gk = 0; gk < giris_k; gk++) {
-                        float g_val = giris[g_base + gk];
-                        int w_base = w_offset + gk * cikis_k;
-                        for (int ck = 0; ck < cikis_k; ck++) {
-                            cikis[out_idx + ck] += g_val * params->w[w_base + ck];
+            int row_idx = h * giris_g + w;
+            int col_idx = 0;
+            for (int cy = -1; cy <= 1; cy++) {
+                for (int cx = -1; cx <= 1; cx++) {
+                    int r = h + cy;
+                    int c = w + cx;
+                    if (r >= 0 && r < giris_y && c >= 0 && c < giris_g) {
+                        int g_base = (r * giris_g + c) * giris_k;
+                        for (int k = 0; k < giris_k; k++) {
+                            im2col_buf[row_idx * kernel_size + col_idx++] = giris[g_base + k];
+                        }
+                    } else {
+                        for (int k = 0; k < giris_k; k++) {
+                            im2col_buf[row_idx * kernel_size + col_idx++] = 0.0f;
                         }
                     }
                 }
             }
         }
     }
+    
+    // GEMM step: cikis = im2col_buf x weights + biases
+    for (int p = 0; p < out_pixels; p++) {
+        int out_base = p * cikis_k;
+        for (int ck = 0; ck < cikis_k; ck++) {
+            float sum = params->b[ck];
+            for (int k = 0; k < kernel_size; k++) {
+                sum += im2col_buf[p * kernel_size + k] * params->w[k * cikis_k + ck];
+            }
+            cikis[out_base + ck] = sum;
+        }
+    }
+    
+    free(im2col_buf);
 }
 
 float* CPUF_Ikilisi_Ayristir(uint8_t* cozulmus_veri, uint32_t toplam_boyut, uint32_t* cikan_boyut) {

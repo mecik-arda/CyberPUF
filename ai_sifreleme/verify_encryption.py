@@ -67,17 +67,17 @@ def parse_encrypted_binary(file_path):
     metadata = json.loads(metadata_json)
     offset += metadata_length
 
-    verify_metadata = {k: v for k, v in metadata.items() if k != 'ciphertext_hmac'}
-    verify_metadata_json = json.dumps(verify_metadata).encode('utf-8')
-
     aad_output = bytearray()
     aad_output.extend(magic)
     aad_output.extend(struct.pack('<B', version_major))
     aad_output.extend(struct.pack('<B', version_minor))
     aad_output.extend(struct.pack('<B', mode_byte))
     aad_output.extend(struct.pack('<B', kdf_mode_byte))
-    aad_output.extend(struct.pack('<I', len(verify_metadata_json)))
-    aad_output.extend(verify_metadata_json)
+    aad_output.extend(struct.pack('<Q', metadata['plaintext_size']))
+    aad_output.extend(bytes.fromhex(metadata['plaintext_sha256']))
+    aad_output.extend(bytes.fromhex(metadata['salt_hex']))
+    if 'mac_salt_hex' in metadata:
+        aad_output.extend(bytes.fromhex(metadata['mac_salt_hex']))
     aad_bytes = bytes(aad_output)
 
     hmac_bytes = b''

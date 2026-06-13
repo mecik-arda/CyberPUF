@@ -42,15 +42,25 @@ def main():
     port = os.environ.get('APP_PORT', '8000')
     url = f"http://{host}:{port}"
     
-    print(f"[→] Tarayıcı açılıyor: {url}")
+    print(f"[→] Tarayıcı açılışı için sunucu bekleniyor: {url}")
     print()
     
-    # Open browser after a short delay
-    time.sleep(2)
-    try:
-        webbrowser.open(url)
-    except:
-        pass
+    import threading
+    import socket
+
+    def open_browser_when_ready(host_addr, port_num, target_url):
+        while True:
+            try:
+                with socket.create_connection((host_addr, int(port_num)), timeout=1):
+                    break
+            except (socket.timeout, ConnectionRefusedError, OSError):
+                time.sleep(0.5)
+        try:
+            webbrowser.open(target_url)
+        except:
+            pass
+
+    threading.Thread(target=open_browser_when_ready, args=(host, port, url), daemon=True).start()
     
     # Start Uvicorn
     print("[✓] Uvicorn başlatılıyor...")

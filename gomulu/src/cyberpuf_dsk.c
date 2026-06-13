@@ -4,6 +4,11 @@
 #include <string.h>
 
 #ifndef XILINX_BAREMETAL_SIM
+#include "xaxidma.h"
+#include "xil_cache.h"
+#endif
+
+#ifndef XILINX_BAREMETAL_SIM
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
@@ -167,35 +172,28 @@ bool CyberPUF_TamponSifreCoz(CyberPUF_Instance *InstancePtr, const uint8_t* sifr
     }
     
     if (InstancePtr->AktifMod == CYBERPUF_MODE_DMA) {
-        /*
-         * GERCEK DONANIMDA AXI DMA (ASENKRON / INTERRUPT TABANLI):
-         * Eger RTOS veya ISR altyapisi varsa fonksiyon asagidaki gibi hemen doner:
-         * XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)sifreli_metin, boyut_bayt, XAXIDMA_DEVICE_TO_DMA);
-         * XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)duz_metin_raw, boyut_bayt, XAXIDMA_DEVICE_TO_DMA);
-         * return true; (Interrupt gelince Callback cagirilir ve IsBusy=false yapilir)
-         */
-         
-        // Simülasyon için PIO API'si kullanilarak DMA akisi taklit edilir
-        for (uint32_t i = 0; i < blocks; i++) {
-            uint8_t current_cipher[16];
-            memcpy(current_cipher, &sifreli_metin[i * 16], 16);
-            
-            uint8_t dec_out[16];
-            if (!CyberPUF_BlokSifreCoz(InstancePtr, current_cipher, dec_out)) {
-                xil_printf("HATA: Blok sifre cozme basarisiz. (Blok %u)\n", i);
-                InstancePtr->IsBusy = false;
-                goto end_unlock;
-            }
-            
-            // CBC Zincirleme (XOR) islemi
-            for (int j = 0; j < 16; j++) {
-                duz_metin[i * 16 + j] = dec_out[j] ^ prev_block[j];
-            }
-            
-            memcpy(prev_block, current_cipher, 16);
-        }
+#ifndef XILINX_BAREMETAL_SIM
+        extern XAxiDma AxiDma;
         
-        // Simülasyonda callback manuel tetiklenir (Test amaciyla)
+        Xil_DCacheFlushRange((INTPTR)sifreli_metin, boyut_bayt);
+        Xil_DCacheInvalidateRange((INTPTR)duz_metin, boyut_bayt);
+
+        int status_rx = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)duz_metin, boyut_bayt, XAXIDMA_DEVICE_TO_DMA);
+        int status_tx = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)sifreli_metin, boyut_bayt, XAXIDMA_DMA_TO_DEVICE);
+
+        if (status_tx != 0 || status_rx != 0) {
+            xil_printf("HATA: DMA transferi baslatilamadi.\n");
+            InstancePtr->IsBusy = false;
+            goto end_unlock;
+        }
+
+        // Asenkron interrupt mimarisinde DMA bitisi callback'te islenir. 
+        // Burada basitce polling yapiyoruz (bloklayici):
+        while (XAxiDma_Busy(&AxiDma, XAXIDMA_DMA_TO_DEVICE) || 
+               XAxiDma_Busy(&AxiDma, XAXIDMA_DEVICE_TO_DMA)) {
+            taskYIELD();
+        }
+#endif
         if (InstancePtr->DmaDoneHandler != NULL) {
             InstancePtr->DmaDoneHandler(InstancePtr->CallBackRef);
         }

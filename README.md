@@ -9,7 +9,7 @@
 ## Türkçe
 
 **Geliştirici:** Arda Meçik (AltaySec bünyesinde geliştirilmiştir)
-**Sürüm:** v3.1.0-Web (Web Dashboard & Arayüz Entegrasyonu)
+**Sürüm:** v3.2.0-Core (Donanım Hızlandırma & Güvenlik Yamaları)
 **Lisans:** MIT
 
 ### 🚀 Hızlı Başlangıç (Quick Start)

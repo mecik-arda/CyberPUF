@@ -49,6 +49,10 @@ architecture rtl of ro_puf_cekirdek is
     signal clear_counters_sync_b1, clear_counters_sync_b2 : std_logic := '1';
     signal count_enable_sync_b1, count_enable_sync_b2 : std_logic := '0';
 
+    signal sayac_a_sync1, sayac_a_sync2 : unsigned(SAYICI_GENISLIGI - 1 downto 0);
+    signal sayac_b_sync1, sayac_b_sync2 : unsigned(SAYICI_GENISLIGI - 1 downto 0);
+    signal lfsr_reg : std_logic_vector(7 downto 0) := "10101010";
+
     component BUFG is
         port (
             O : out std_logic;
@@ -138,7 +142,18 @@ begin
             ro_count_b <= (others => '0');
             count_enable <= '0';
             clear_counters <= '1';
+            lfsr_reg <= "10101010";
+            sayac_a_sync1 <= (others => '0');
+            sayac_a_sync2 <= (others => '0');
+            sayac_b_sync1 <= (others => '0');
+            sayac_b_sync2 <= (others => '0');
         elsif rising_edge(clk) then
+            lfsr_reg <= lfsr_reg(6 downto 0) & (lfsr_reg(7) xor lfsr_reg(5) xor lfsr_reg(4) xor lfsr_reg(3));
+            sayac_a_sync1 <= sayac_a;
+            sayac_a_sync2 <= sayac_a_sync1;
+            sayac_b_sync1 <= sayac_b;
+            sayac_b_sync2 <= sayac_b_sync1;
+
             response_valid <= '0';
 
             case state is
@@ -198,13 +213,15 @@ begin
                     end if;
 
                 when COMPARE =>
-                    ro_count_a <= std_logic_vector(sayac_a);
-                    ro_count_b <= std_logic_vector(sayac_b);
+                    ro_count_a <= std_logic_vector(sayac_a_sync2);
+                    ro_count_b <= std_logic_vector(sayac_b_sync2);
 
-                    if sayac_a > sayac_b then
+                    if sayac_a_sync2 > sayac_b_sync2 then
                         response_bit <= '1';
-                    else
+                    elsif sayac_a_sync2 < sayac_b_sync2 then
                         response_bit <= '0';
+                    else
+                        response_bit <= lfsr_reg(0);
                     end if;
                     state <= OUTPUT_RESULT;
 

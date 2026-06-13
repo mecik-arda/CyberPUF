@@ -125,6 +125,7 @@ architecture rtl of axi4_lite_sarmalayici is
     signal axis_word_count  : integer range 0 to 3 := 0;
     signal axis_data_ready  : std_logic := '0';
     signal dma_mode_active  : std_logic;
+    signal dma_direction    : std_logic;
     signal wait_for_aes     : std_logic := '0';
     
     signal m_axis_word_count : integer range 0 to 3 := 0;
@@ -169,6 +170,7 @@ begin
     rst_internal <= not S_AXI_ARESETN;
     
     dma_mode_active <= reg_control(5);
+    dma_direction <= reg_control(6);
 
     core_data_in <= axis_data_buffer when dma_mode_active = '1' else
                     reg_data_in_3 & reg_data_in_2 & reg_data_in_1 & reg_data_in_0;
@@ -219,8 +221,9 @@ begin
     end process;
 
     cmd_generate_key_pulse <= reg_control(0) and (not cmd_generate_key_r);
-    cmd_start_encrypt_pulse <= reg_control(2) and (not cmd_start_encrypt_r);
-    cmd_start_decrypt_pulse <= axis_data_ready when dma_mode_active = '1' else 
+    cmd_start_encrypt_pulse <= (axis_data_ready and dma_direction) when dma_mode_active = '1' else
+                               (reg_control(2) and (not cmd_start_encrypt_r));
+    cmd_start_decrypt_pulse <= (axis_data_ready and (not dma_direction)) when dma_mode_active = '1' else 
                                (reg_control(1) and (not cmd_start_decrypt_r));
 
     -- AXI-Stream Slave (32-bit to 128-bit birleştirme)

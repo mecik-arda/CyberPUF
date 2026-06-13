@@ -259,13 +259,11 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='di
     else:
         aad_output.extend(struct.pack('<B', 0x00))
     
-    temp_metadata = encryption_metadata.copy()
-    if 'ciphertext_hmac' in temp_metadata:
-        del temp_metadata['ciphertext_hmac']
-    metadata_json = json.dumps(temp_metadata).encode('utf-8')
-    
-    aad_output.extend(struct.pack('<I', len(metadata_json)))
-    aad_output.extend(metadata_json)
+    aad_output.extend(struct.pack('<Q', encryption_metadata['plaintext_size']))
+    aad_output.extend(bytes.fromhex(encryption_metadata['plaintext_sha256']))
+    aad_output.extend(bytes.fromhex(encryption_metadata['salt_hex']))
+    if encryption_metadata.get('mac_salt_hex'):
+        aad_output.extend(bytes.fromhex(encryption_metadata['mac_salt_hex']))
     aad_bytes = bytes(aad_output)
 
     if encryption_mode == 'GCM':
@@ -449,11 +447,13 @@ def encrypt_weights(weight_binary_path=None, encryption_mode='GCM', mac_mode='di
     print("Sonraki adim: verify_encryption.py ile uctan uca dogrulama yapin.")
     print("=" * 70)
 
-    # Bellek Guvenligi Icin Oneri: Islem bittikten sonra ctypes.memset ile aes_key bellekten silinmelidir.
-    import ctypes
-    # ctypes.memset(id(aes_key) + 33, 0, len(aes_key)) # Python bellek yonetimi yuzunden dikkatli kullanilmalidir
-
-    return encrypted_binary, aes_key, nonce, auth_tag
+    # Bellek izolasyonu: bytearray zerolization ile bellekten guvenli silme
+    aes_key_ba = bytearray(aes_key)
+    for i in range(len(aes_key_ba)):
+        aes_key_ba[i] = 0
+    del aes_key
+    
+    return encrypted_binary, bytes(aes_key_ba), nonce, auth_tag
 
 
 if __name__ == '__main__':
