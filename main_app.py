@@ -249,7 +249,7 @@ async def start_training(params: TrainParams, token: str = Depends(verify_token)
     if "phase1" in running_tasks:
         return {"error": "Zaten calisiyor"}
     cmd = [
-        sys.executable, "run_phase1.py",
+        sys.executable, "calistirma_betikleri/run_phase1.py",
         str(params.epochs),
         str(params.batch_size),
         str(params.learning_rate),
@@ -375,9 +375,9 @@ async def run_security_tests(token: str = Depends(verify_token)):
             # 2. Pytest Komutunun Çalıştırılması
             cmd = [
                 sys.executable, "-m", "pytest",
-                "test_manipulasyon_dayanikliligi.py",
-                "test_puf_gurultu_simulasyonu.py",
-                "test_uctan_uca_akis.py",
+                "testler/test_manipulasyon_dayanikliligi.py",
+                "testler/test_puf_gurultu_simulasyonu.py",
+                "testler/test_uctan_uca_akis.py",
                 "-v", "--color=yes"
             ]
             
@@ -404,7 +404,7 @@ async def run_security_tests(token: str = Depends(verify_token)):
 async def deploy_ota(token: str = Depends(verify_token)):
     if "ota_deployment" in running_tasks:
         return {"error": "Zaten calisiyor"}
-    cmd = [sys.executable, "run_phase5.py"]
+    cmd = [sys.executable, "calistirma_betikleri/run_phase5.py"]
     task = asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "Uç Cihaz Dağıtımı", "ota_deployment"))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
@@ -414,7 +414,7 @@ async def deploy_ota(token: str = Depends(verify_token)):
 async def monitor_network(token: str = Depends(verify_token)):
     if "network_monitor" in running_tasks:
         return {"error": "Zaten calisiyor"}
-    cmd = [sys.executable, "run_phase6.py"]
+    cmd = [sys.executable, "calistirma_betikleri/run_phase6.py"]
     task = asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "Ağ Trafiği Gözetimi", "network_monitor"))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
@@ -424,7 +424,7 @@ async def monitor_network(token: str = Depends(verify_token)):
 async def tee_attestation(token: str = Depends(verify_token)):
     if "tee_attestation" in running_tasks:
         return {"error": "Zaten calisiyor"}
-    cmd = [sys.executable, "run_phase7.py"]
+    cmd = [sys.executable, "calistirma_betikleri/run_phase7.py"]
     task = asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "TEE Attestation", "tee_attestation"))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)

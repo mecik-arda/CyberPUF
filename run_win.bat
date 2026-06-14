@@ -1,4 +1,4 @@
 @echo off
 title CyberPUF Edge-AI Dashboard
-python start_app.py
+python calistirma_betikleri/start_app.py
 pause

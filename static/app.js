@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     clearTermBtn.addEventListener('click', () => {
-        systemTerminalBody.innerHTML = '<div class="term-line welcome">CyberPUF OS v3.0 Terminal\'ine Hoş Geldiniz.</div>';
+        systemTerminalBody.innerHTML = '<div class="term-line welcome">CyberPUF OS v4.0.0-Gold Terminal\'ine Hoş Geldiniz.</div>';
         const dynamicWindows = document.querySelectorAll('.terminal-window:not(#term-system)');
         dynamicWindows.forEach(w => w.remove());
     });

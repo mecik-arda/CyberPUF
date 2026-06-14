@@ -68,10 +68,10 @@ def test_embedded_c_logic():
     
     # Run test from the ai_sifreleme directory context because we need crypto_utils
     import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'ai_sifreleme'))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ai_sifreleme'))
     from crypto_utils import get_puf_key
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(override=True)
     
     bin_path = os.path.join("output", "encrypted_weights", "cyberpuf_encrypted_weights.bin")
     if not os.path.exists(bin_path):

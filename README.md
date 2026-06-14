@@ -34,7 +34,7 @@ nano .env
 
 ```bash
 # Uygulamayı başlat:
-python start_app.py
+python calistirma_betikleri/start_app.py
 
 # Tarayıcıda açın:
 # http://127.0.0.1:8000
@@ -80,10 +80,10 @@ Proje, Yazılım Yapay Zekası, Donanım Kriptografisi ve Gömülü Sistemleri (
 
 ### 🛡️ Kapsamlı Güvenlik ve Entegrasyon Testleri (Pytest)
 CyberPUF sisteminin hem kriptografik sağlamlığını hem de modüller arası uyumunu garanti altına almak için tasarlanmış otomatik test senaryoları (%100 Başarı Oranı):
-- `test_manipulasyon_dayanikliligi.py`: Sisteme yönelik aktif saldırıları simüle eder. Kurcalanan veya kırpılan verilerin reddedildiğini doğrular.
-- `test_puf_gurultu_simulasyonu.py`: PUF anahtarındaki 1 bitlik çevresel gürültünün bile tüm şifre çözme işlemini iptal ettiğini matematiksel olarak test eder.
-- `test_uctan_uca_akis.py`: Şifrelenen ve deşifre edilen numpy dizilerinin bit-by-bit aynı olup olmadığını uçtan uca (E2E) test eder.
-- `test_api.py` & `test_c_logic.py`: FastAPI Web Dashboard arka ucunun (Backend) güvenlik protokollerini asenkron (async/await) yapıları dahi test eden entegrasyon testleri.
+- `testler/test_manipulasyon_dayanikliligi.py`: Sisteme yönelik aktif saldırıları simüle eder. Kurcalanan veya kırpılan verilerin reddedildiğini doğrular.
+- `testler/test_puf_gurultu_simulasyonu.py`: PUF anahtarındaki 1 bitlik çevresel gürültünün bile tüm şifre çözme işlemini iptal ettiğini matematiksel olarak test eder.
+- `testler/test_uctan_uca_akis.py`: Şifrelenen ve deşifre edilen numpy dizilerinin bit-by-bit aynı olup olmadığını uçtan uca (E2E) test eder.
+- `testler/test_api.py` & `testler/test_c_logic.py`: FastAPI Web Dashboard arka ucunun (Backend) güvenlik protokollerini asenkron (async/await) yapıları dahi test eden entegrasyon testleri.
 
 ---
 
@@ -124,7 +124,7 @@ A modern, asynchronous, cyberpunk-themed web interface designed for end-to-end c
 
 ### 🛡️ Comprehensive Security and Integration Testing (Pytest)
 Automated Pytest suites achieving a 100% pass rate:
-- `test_manipulasyon_dayanikliligi.py`, `test_puf_gurultu_simulasyonu.py`, `test_uctan_uca_akis.py`, `test_api.py`.
+- `testler/test_manipulasyon_dayanikliligi.py`, `testler/test_puf_gurultu_simulasyonu.py`, `testler/test_uctan_uca_akis.py`, `testler/test_api.py`.
 Tests ranging from fuzzy extractor bounds, active ciphertext tampering, to asynchronous WebSocket security route authorizations.
 
 ### Getting Started
@@ -141,5 +141,5 @@ cp .env.example .env
 # Edit .env and securely configure CYBERPUF_AES_KEY and WEBSOCKET_TOKEN
 
 # Start the application!
-python start_app.py
+python calistirma_betikleri/start_app.py
 ```
