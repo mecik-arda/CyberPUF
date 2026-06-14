@@ -1,6 +1,6 @@
 # CyberPUF: PUF Tabanlı Uç Yapay Zeka (Edge-AI) Model Ağırlığı Şifrelemesi
 
-![CyberPUF Web Dashboard](ekran_goruntuleri/1.png)
+![CyberPUF Web Dashboard](ekran_goruntuleri/1.png?v=4.0.0-Gold)
 [Türkçe](#turkce) | [English](#english)
 
 ---
