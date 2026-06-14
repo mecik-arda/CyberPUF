@@ -41,8 +41,7 @@ def main():
     host = os.environ.get('APP_HOST', '127.0.0.1')
     port = os.environ.get('APP_PORT', '8000')
     url = f"http://{host}:{port}"
-    
-    print(f"[→] Tarayıcı açılışı için sunucu bekleniyor: {url}")
+    print(f"[->] Tarayıcı açılışı için sunucu bekleniyor: {url}")
     print()
     
     import threading
@@ -67,13 +66,19 @@ def main():
     print("=" * 60)
     print()
     
-    subprocess.run([
+    cmd = [
         sys.executable, '-m', 'uvicorn',
         'main_app:app',
         '--host', host,
-        '--port', port,
-        '--reload'
-    ])
+        '--port', port
+    ]
+    
+    # Windows'ta asyncio subprocess çökmelerini önlemek için reload kapatılır.
+    # Uvicorn başlatılırken OS tespiti ve detaylı loglama main_app.py içinde yapıldığı için burada sadece parametre ayarlanır.
+    if sys.platform != 'win32':
+        cmd.append('--reload')
+        
+    subprocess.run(cmd)
 
 if __name__ == '__main__':
     main()

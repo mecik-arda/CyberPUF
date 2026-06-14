@@ -1,3 +1,4 @@
+import pytest
 import asyncio
 import websockets
 import json
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+@pytest.mark.asyncio
 async def test_api_and_websocket():
     print("--- Web API & WebSocket Testi ---")
     

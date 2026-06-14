@@ -159,6 +159,55 @@
                     </div>
                 </div>
             </section>
+            
+            <!-- RIGHT PANEL 2: Security Tests -->
+            <section class="panel glass-panel">
+                <h2>Faz 4: Güvenlik & Sızma Analizi</h2>
+                <div class="simulation-controls">
+                    <p class="description">CyberPUF sisteminin kriptografik bütünlüğüne ve PUF hata düzeltme (Fuzzy Extractor) modülüne yönelik siber saldırıları (Tampering, Gürültü Enjeksiyonu) simüle edin.</p>
+                    <button class="btn primary-btn" id="btn-security-test" style="background: linear-gradient(135deg, rgba(220, 20, 60, 0.8), rgba(255, 69, 0, 0.8)); border-color: crimson;">
+                        <span class="btn-text">Güvenlik Testlerini Başlat</span>
+                        <div class="spinner hidden" id="sec-spinner"></div>
+                    </button>
+                </div>
+            </section>
+            
+            <!-- NEW PHASES (5, 6, 7) -->
+            <!-- RIGHT PANEL 3: OTA Deployment -->
+            <section class="panel glass-panel">
+                <h2>Faz 5: Uç Cihaz Dağıtımı</h2>
+                <div class="simulation-controls">
+                    <p class="description">Şifrelenmiş yapay zeka modelini (ağırlıkları) güvenli MQTT/HTTPS kanalı üzerinden uç cihaza (Edge Node) aktarın.</p>
+                    <button class="btn secondary-btn" id="btn-phase5" style="border-color: var(--neon-cyan);">
+                        <span class="btn-text">Modeli Cihaza Gönder</span>
+                        <div class="spinner hidden" id="phase5-spinner"></div>
+                    </button>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL 4: Network Monitor -->
+            <section class="panel glass-panel">
+                <h2>Faz 6: Ağ Trafiği Gözetimi</h2>
+                <div class="simulation-controls">
+                    <p class="description">Dağıtım ve çıkarım sırasındaki ağ paketlerini dinleyerek MiTM (Ortadaki Adam) saldırılarını analiz edin.</p>
+                    <button class="btn secondary-btn" id="btn-phase6" style="border-color: var(--neon-cyan);">
+                        <span class="btn-text">Ağ Trafiğini İzle</span>
+                        <div class="spinner hidden" id="phase6-spinner"></div>
+                    </button>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL 5: TEE Attestation -->
+            <section class="panel glass-panel">
+                <h2>Faz 7: TEE Attestation</h2>
+                <div class="simulation-controls">
+                    <p class="description">İşlemlerin orijinal donanımda (CyberPUF Core) çalıştığını doğrulayan kriptografik Donanım Onay Raporu oluşturun.</p>
+                    <button class="btn secondary-btn" id="btn-phase7" style="border-color: var(--neon-cyan);">
+                        <span class="btn-text">Attestation Raporu Al</span>
+                        <div class="spinner hidden" id="phase7-spinner"></div>
+                    </button>
+                </div>
+            </section>
         </main>
 
         <!-- WEIGHT VISUALIZATION PANEL -->
@@ -275,6 +324,15 @@
                         <li><strong>Tahmin Edilen Sınıf:</strong> Donanımdaki modelin bu resmi ne olarak algıladığını gösterir.</li>
                         <li><strong>Güven (Confidence):</strong> Modelin bu tahminden ne kadar emin olduğunu yüzdelik olarak belirtir.</li>
                         <li><strong>PUF Durumu:</strong> Eğer bir saldırgan modeli başka çipe kopyalamaya çalıştıysa, hedefteki PUF farklı bir anahtar üretecek ve <em>❌ BAŞARISIZ (Güvenlik İhlali)</em> hatası verecektir. Böylece AI çalınması engellenir.</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card phase4-card">
+                    <h3>Faz 4: Güvenlik & Sızma Analizi</h3>
+                    <p>CyberPUF sisteminin siber saldırılara ve fiziksel müdahalelere karşı direncini interaktif olarak test eder.</p>
+                    <ul>
+                        <li><strong>Kriptografik Bütünlük (Tampering):</strong> Şifreli model dosyalarına dışarıdan yetkisiz müdahale edildiğinde sistemin durumu algılayıp çalışmayı reddetmesi senaryosu (Fail-safe).</li>
+                        <li><strong>Çevresel Gürültü (Noise):</strong> Sıcaklık, voltaj gibi çevresel değişimlerin donanımdaki PUF kararlılığına etkisini simüle eder. Hata düzeltme (Fuzzy Extractor) ile entropi kaybı yaşanıp yaşanmadığı analiz edilir.</li>
                     </ul>
                 </div>
             </div>

@@ -4,6 +4,7 @@ import asyncio
 import shutil
 import re
 import hmac
+import json
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +19,9 @@ import numpy as np
 from PIL import Image
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends, status
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 app = FastAPI(title="CyberPUF Dashboard")
 
@@ -44,10 +48,15 @@ async def security_middleware(request: Request, call_next):
 
 # CORS configuration from environment
 allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
+allow_creds = True
+if "*" in allowed_origins:
+    allowed_origins = ["*"]
+    allow_creds = False
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=allow_creds,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
@@ -106,7 +115,11 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008, reason="Invalid token")
         return
 
-    last_msg_time = 0
+    # Token Bucket Flooding protection
+    bucket_capacity = 50
+    tokens = bucket_capacity
+    last_msg_time = asyncio.get_running_loop().time()
+    
     try:
         while True:
             data = await websocket.receive_text()
@@ -116,20 +129,30 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.close(code=1009, reason="Message too large")
                 break
                 
-            # Flooding protection (max 10 msgs per second)
-            current_time = asyncio.get_event_loop().time()
-            if current_time - last_msg_time < 0.1:
-                await websocket.close(code=1008, reason="Too many requests")
-                break
+            current_time = asyncio.get_running_loop().time()
+            elapsed = current_time - last_msg_time
             last_msg_time = current_time
+            
+            # Refill tokens (10 per second)
+            tokens = min(bucket_capacity, tokens + elapsed * 10)
+            
+            if tokens < 1:
+                # Rate limit exceeded, warn and throttle instead of disconnecting immediately
+                try:
+                    await websocket.send_text(json.dumps({"type": "log", "task_id": "system", "task_name": "Sistem", "message": "[UYARI] Ağ trafiği kısıtlaması: Rate-limit aşıldı, lütfen yavaşlayın."}))
+                except Exception:
+                    pass
+                await asyncio.sleep(0.5)
+                continue
+                
+            tokens -= 1
             
     except WebSocketDisconnect:
         pass
     finally:
         manager.disconnect(websocket)
 
-async def run_subprocess_and_broadcast(cmd: list, cwd: str, task_name: str, task_id: str, max_timeout: int = None):
-    import json
+async def run_subprocess_and_broadcast(cmd: list, cwd: str, task_name: str, task_id: str, max_timeout: int = None, extra_env: dict = None):
     if task_id in running_tasks:
         await manager.broadcast(json.dumps({"type": "log", "task_id": task_id, "task_name": task_name, "message": f"[{task_name}] Zaten calisiyor!"}))
         return
@@ -140,6 +163,9 @@ async def run_subprocess_and_broadcast(cmd: list, cwd: str, task_name: str, task
     
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    
+    if extra_env:
+        env.update(extra_env)
     
     aes_key = os.environ.get("CYBERPUF_AES_KEY")
     if not aes_key:
@@ -176,7 +202,11 @@ async def run_subprocess_and_broadcast(cmd: list, cwd: str, task_name: str, task
         _background_tasks.add(read_task)
         read_task.add_done_callback(_background_tasks.discard)
         try:
-            timeout = max_timeout or int(os.environ.get("SUBPROCESS_TIMEOUT", "600"))
+            try:
+                env_timeout = int(os.environ.get("SUBPROCESS_TIMEOUT", "600"))
+            except ValueError:
+                env_timeout = 600
+            timeout = max_timeout or env_timeout
             await asyncio.wait_for(process.wait(), timeout=timeout)
             await manager.broadcast(json.dumps({"type": "log", "task_id": task_id, "task_name": task_name, "message": f"[{task_name}] Tamamlandi. Cikis Kodu: {process.returncode}"}))
         except asyncio.TimeoutError:
@@ -324,6 +354,82 @@ async def start_simulation(token: str = Depends(verify_token)):
     task.add_done_callback(_background_tasks.discard)
     return {"message": "Simulasyon baslatildi"}
 
+@app.post("/api/run_security_tests")
+async def run_security_tests(token: str = Depends(verify_token)):
+    if "security_tests" in running_tasks:
+        return {"error": "Zaten calisiyor"}
+        
+    async def execute_tests():
+        task_name = "Güvenlik & Sızma Testleri"
+        task_id = "security_tests"
+        
+        try:
+            # 1. Sinematik Yükleme Mesajları
+            await manager.broadcast(json.dumps({"type": "log", "task_id": task_id, "task_name": task_name, "message": f"[{task_name}] [Sistem] Güvenlik duvarı analiz ediliyor..."}))
+            await asyncio.sleep(1.0)
+            await manager.broadcast(json.dumps({"type": "log", "task_id": task_id, "task_name": task_name, "message": f"[{task_name}] [Sistem] Kriptografik bütünlük saldırıları başlatılıyor..."}))
+            await asyncio.sleep(1.0)
+            await manager.broadcast(json.dumps({"type": "log", "task_id": task_id, "task_name": task_name, "message": f"[{task_name}] [Sistem] PUF Çevresel gürültü tolerans testleri yükleniyor...\n"}))
+            await asyncio.sleep(0.5)
+
+            # 2. Pytest Komutunun Çalıştırılması
+            cmd = [
+                sys.executable, "-m", "pytest",
+                "test_manipulasyon_dayanikliligi.py",
+                "test_puf_gurultu_simulasyonu.py",
+                "test_uctan_uca_akis.py",
+                "-v", "--color=yes"
+            ]
+            
+            # extra_env kullanarak thread-safe sekilde çevre degiskeni veriyoruz
+            await run_subprocess_and_broadcast(cmd, ".", task_name, f"{task_id}_inner", extra_env={"FORCE_COLOR": "1"})
+        except Exception as e:
+            await manager.broadcast(json.dumps({"type": "log", "task_id": task_id, "task_name": task_name, "message": f"[{task_name}] [HATA] Testler başlatılırken kritik bir hata oluştu: {str(e)}"}))
+            import traceback
+            traceback.print_exc()
+
+    running_tasks["security_tests"] = True
+    def cleanup(task):
+        running_tasks.pop("security_tests", None)
+        if not task.cancelled() and task.exception():
+            print(f"[HATA] Arka plan görevi çöktü: {task.exception()}")
+            
+    task = asyncio.create_task(execute_tests())
+    _background_tasks.add(task)
+    task.add_done_callback(cleanup)
+    task.add_done_callback(_background_tasks.discard)
+    return {"message": "Guvenlik testleri baslatildi"}
+
+@app.post("/api/deploy_ota")
+async def deploy_ota(token: str = Depends(verify_token)):
+    if "ota_deployment" in running_tasks:
+        return {"error": "Zaten calisiyor"}
+    cmd = [sys.executable, "run_phase5.py"]
+    task = asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "Uç Cihaz Dağıtımı", "ota_deployment"))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return {"message": "Dağıtım başlatıldı"}
+
+@app.post("/api/monitor_network")
+async def monitor_network(token: str = Depends(verify_token)):
+    if "network_monitor" in running_tasks:
+        return {"error": "Zaten calisiyor"}
+    cmd = [sys.executable, "run_phase6.py"]
+    task = asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "Ağ Trafiği Gözetimi", "network_monitor"))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return {"message": "Ağ gözetimi başlatıldı"}
+
+@app.post("/api/tee_attestation")
+async def tee_attestation(token: str = Depends(verify_token)):
+    if "tee_attestation" in running_tasks:
+        return {"error": "Zaten calisiyor"}
+    cmd = [sys.executable, "run_phase7.py"]
+    task = asyncio.create_task(run_subprocess_and_broadcast(cmd, ".", "TEE Attestation", "tee_attestation"))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return {"message": "Attestation başlatıldı"}
+
 @app.get("/api/test_images")
 async def get_test_images(token: str = Depends(verify_token)):
     test_images_dir = os.path.join("static", "test_images")
@@ -389,4 +495,19 @@ if __name__ == "__main__":
     host = os.environ.get("APP_HOST", "127.0.0.1")
     port = int(os.environ.get("APP_PORT", "8000"))
     debug = os.environ.get("APP_DEBUG", "False").lower() == "true"
+    
+    # Sistem tespit ve Uvicorn reload uyumluluk ayarı
+    import platform
+    os_name = platform.system()
+    
+    if os_name == "Windows":
+        if debug:
+            print(f"[BİLGİ] Sistem tespit edildi: {os_name}")
+            print("[UYARI] Windows üzerinde asyncio alt süreç (subprocess) uyumluluğunu sağlamak için Uvicorn reload devre dışı bırakıldı.")
+            debug = False
+    elif os_name in ["Linux", "Darwin"]:
+        if debug:
+            print(f"[BİLGİ] Sistem tespit edildi: {os_name}")
+            print("[BİLGİ] İşletim sisteminiz alt süreçleri tam destekliyor, Uvicorn Hot-Reload aktif edildi.")
+            
     uvicorn.run("main_app:app", host=host, port=port, reload=debug)

@@ -33,6 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const authTokenInput = document.getElementById('auth-token-input');
     const authSubmitBtn = document.getElementById('auth-submit-btn');
 
+    // Button references
+    const btnPhase5 = document.getElementById('btn-phase5');
+    const btnPhase6 = document.getElementById('btn-phase6');
+    const btnPhase7 = document.getElementById('btn-phase7');
+
     // Terminal Logging
     const MAX_TERMINAL_LINES = 1000;
 
@@ -115,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let wsReconnectDelay = 1000;
     const MAX_RECONNECT_DELAY = 30000;
     let cachedWsToken = null;
-    let authPromiseResolver = null;
+    let authPromiseResolvers = [];
 
     async function getWebSocketToken() {
         if (cachedWsToken) {
@@ -125,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         authModal.classList.remove('hidden');
         
         return new Promise((resolve) => {
-            authPromiseResolver = resolve;
+            authPromiseResolvers.push(resolve);
         });
     }
 
@@ -134,9 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token) {
             cachedWsToken = token;
             authModal.classList.add('hidden');
-            if (authPromiseResolver) {
-                authPromiseResolver(token);
-                authPromiseResolver = null;
+            if (authPromiseResolvers.length > 0) {
+                authPromiseResolvers.forEach(resolve => resolve(token));
+                authPromiseResolvers = [];
             }
         }
     });
@@ -313,6 +318,90 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 hwSimBtn.disabled = false;
                 hwSimSpinner.classList.add('hidden');
+            }
+        });
+    }
+
+    // Security Tests (Phase 4)
+    const btnSecurityTest = document.getElementById('btn-security-test');
+    const secSpinner = document.getElementById('sec-spinner');
+
+    if (btnSecurityTest) {
+        btnSecurityTest.addEventListener('click', async () => {
+            btnSecurityTest.disabled = true;
+            secSpinner.classList.remove('hidden');
+            
+            // Create console manually if it doesn't exist
+            getOrCreateTerminal('security_tests', 'Güvenlik & Sızma Testleri');
+
+            try {
+                await fetchAPI('/api/run_security_tests', { method: 'POST' });
+                logToTerminal('[Sistem] Güvenlik testleri komutu sunucuya iletildi.', 'info', 'security_tests', 'Güvenlik & Sızma Testleri');
+            } catch(err) {
+                logToTerminal(`[Hata] Güvenlik testleri başlatılamadı: ${err.message}`, 'error', 'security_tests', 'Güvenlik & Sızma Testleri');
+            } finally {
+                btnSecurityTest.disabled = false;
+                secSpinner.classList.add('hidden');
+            }
+        });
+    }
+
+    // Phase 5 (OTA Deployment)
+    const phase5Spinner = document.getElementById('phase5-spinner');
+    if (btnPhase5) {
+        btnPhase5.addEventListener('click', async () => {
+            btnPhase5.disabled = true;
+            if(phase5Spinner) phase5Spinner.classList.remove('hidden');
+            getOrCreateTerminal('ota_deployment', 'Uç Cihaz Dağıtımı (OTA)');
+
+            try {
+                await fetchAPI('/api/deploy_ota', { method: 'POST' });
+                logToTerminal('[Sistem] OTA Dağıtım komutu sunucuya iletildi.', 'info', 'ota_deployment', 'Uç Cihaz Dağıtımı');
+            } catch(err) {
+                logToTerminal(`[Hata] Dağıtım başlatılamadı: ${err.message}`, 'error', 'ota_deployment', 'Uç Cihaz Dağıtımı');
+            } finally {
+                btnPhase5.disabled = false;
+                if(phase5Spinner) phase5Spinner.classList.add('hidden');
+            }
+        });
+    }
+
+    // Phase 6 (Network Monitor)
+    const phase6Spinner = document.getElementById('phase6-spinner');
+    if (btnPhase6) {
+        btnPhase6.addEventListener('click', async () => {
+            btnPhase6.disabled = true;
+            if(phase6Spinner) phase6Spinner.classList.remove('hidden');
+            getOrCreateTerminal('network_monitor', 'Ağ Trafiği Gözetimi');
+
+            try {
+                await fetchAPI('/api/monitor_network', { method: 'POST' });
+                logToTerminal('[Sistem] Ağ gözetim komutu sunucuya iletildi.', 'info', 'network_monitor', 'Ağ Trafiği Gözetimi');
+            } catch(err) {
+                logToTerminal(`[Hata] Ağ gözetimi başlatılamadı: ${err.message}`, 'error', 'network_monitor', 'Ağ Trafiği Gözetimi');
+            } finally {
+                btnPhase6.disabled = false;
+                if(phase6Spinner) phase6Spinner.classList.add('hidden');
+            }
+        });
+    }
+
+    // Phase 7 (TEE Attestation)
+    const phase7Spinner = document.getElementById('phase7-spinner');
+    if (btnPhase7) {
+        btnPhase7.addEventListener('click', async () => {
+            btnPhase7.disabled = true;
+            if(phase7Spinner) phase7Spinner.classList.remove('hidden');
+            getOrCreateTerminal('tee_attestation', 'TEE Attestation');
+
+            try {
+                await fetchAPI('/api/tee_attestation', { method: 'POST' });
+                logToTerminal('[Sistem] TEE Attestation komutu sunucuya iletildi.', 'info', 'tee_attestation', 'TEE Attestation');
+            } catch(err) {
+                logToTerminal(`[Hata] Attestation başlatılamadı: ${err.message}`, 'error', 'tee_attestation', 'TEE Attestation');
+            } finally {
+                btnPhase7.disabled = false;
+                if(phase7Spinner) phase7Spinner.classList.add('hidden');
             }
         });
     }
